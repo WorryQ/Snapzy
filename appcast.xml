@@ -6,6 +6,22 @@
     <description>Snapzy application updates</description>
     <language>en</language>
     <item>
+      <title>Version 1.15.0</title>
+      <sparkle:version>96</sparkle:version>
+      <sparkle:shortVersionString>1.15.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 15 May 2026 07:27:09 +0000</pubDate>
+      <description><![CDATA[
+        <style>:root { color-scheme: light dark; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.5; padding: 8px 16px; } h3 { font-size: 14px; margin: 12px 0 6px; } ul { padding-left: 20px; margin: 4px 0; } li { margin: 3px 0; }</style>
+        <h3>✨ Features</h3><ul><li>Implement pinned screenshot windows with QuickAccessPinWindow and manager</li><li>Add refresh icon to status bar menu for improved user experience</li><li>Enhance image cropping functionality with improved scaling and pixel alignment for multi-display support</li><li>Enhance inline area annotation with multi-display support</li><li>Enhance multi-display screenshot functionality and improve capture session management</li><li>Add cloud upload functionality for capture history items with localization support</li><li>Implement Quick Access action customization and configuration</li></ul><h3>🐛 Bug Fixes</h3><ul><li>Enhance localization error reporting with detailed missing and extra keys</li><li>Enhance multi-display capture functionality with target display selection</li><li>Improve capture markup sharpness by aligning cropped images to display pixel grid</li></ul>
+      ]]></description>
+      <enclosure
+        url="https://github.com/duongductrong/Snapzy/releases/download/v1.15.0/Snapzy-v1.15.0.dmg"
+        sparkle:edSignature="4TP8o71XFKsH7vnJBMQIxoQgcryYaPKOQfC/7DK365Qa5D4oURhLQMm45d6PThgPCAJkRsLY+B5D15dAbQ71DQ=="
+        length="45853741"
+        type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Version 1.14.3</title>
       <sparkle:version>95</sparkle:version>
       <sparkle:shortVersionString>1.14.3</sparkle:shortVersionString>
