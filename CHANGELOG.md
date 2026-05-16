@@ -50,6 +50,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+
+## [1.16.0] - 2026-05-16
+
+### Features
+-  Implement toggle sidebar functionality with keyboard shortcut support (cmd+b) (e2c699a)
+-  add blurred background effects to annotation canvas (cab959d)
+-  Add background ratio and orientation options for annotation canvas (#185) (7f8e6dc)
+
+### Chore
+- chore: update appcast, cask, and readme for v1.15.1 (60eff5b)
+
+### Contributors
+- @duongductrong
+- @github-actions[bot]
+
 ## [1.15.1] - 2026-05-15
 
 ### Chore
