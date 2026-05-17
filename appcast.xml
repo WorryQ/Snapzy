@@ -6,6 +6,22 @@
     <description>Snapzy application updates</description>
     <language>en</language>
     <item>
+      <title>Version 1.16.2</title>
+      <sparkle:version>100</sparkle:version>
+      <sparkle:shortVersionString>1.16.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 17 May 2026 19:23:46 +0000</pubDate>
+      <description><![CDATA[
+        <style>:root { color-scheme: light dark; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.5; padding: 8px 16px; } h3 { font-size: 14px; margin: 12px 0 6px; } ul { padding-left: 20px; margin: 4px 0; } li { margin: 3px 0; }</style>
+        <h3>✨ Features</h3><ul><li>Add microphone input selection for screen recordings</li><li>Add cursor visibility option in recording settings and update related functionality</li></ul>
+      ]]></description>
+      <enclosure
+        url="https://github.com/duongductrong/Snapzy/releases/download/v1.16.2/Snapzy-v1.16.2.dmg"
+        sparkle:edSignature="UsNT26d0NpfhRUMZQkraugWWQ+3XMLgdxUfoTvXd2WfL92F6Jp92YHywUWCk4VNAqyZL78uHCKdR/fiHCHIOAg=="
+        length="46004218"
+        type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Version 1.16.1</title>
       <sparkle:version>99</sparkle:version>
       <sparkle:shortVersionString>1.16.1</sparkle:shortVersionString>
