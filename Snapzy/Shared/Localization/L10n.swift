@@ -1803,6 +1803,11 @@ enum L10n {
       defaultValue: "Desktop",
       comment: "Capture preferences section title"
     )
+    static let annotateSection = string(
+      "preferences-capture.section-annotate",
+      defaultValue: "Annotate",
+      comment: "Capture preferences section title"
+    )
     static let screenshotFormatSection = string(
       "preferences-capture.section-screenshot-format",
       defaultValue: "Screenshot Format",
@@ -1874,6 +1879,31 @@ enum L10n {
       "preferences-capture.include-in-recordings-description",
       defaultValue: "Show Snapzy windows such as Annotate in recorded videos",
       comment: "Capture preferences setting description"
+    )
+    static let annotateClipboardTitle = string(
+      "preferences-capture.annotate-clipboard-title",
+      defaultValue: "Clipboard image on Open Annotate",
+      comment: "Capture preferences setting title for clipboard image behavior"
+    )
+    static let annotateClipboardDescription = string(
+      "preferences-capture.annotate-clipboard-description",
+      defaultValue: "Choose what happens when a clipboard image is available while opening Annotate",
+      comment: "Capture preferences setting description for clipboard image behavior"
+    )
+    static let annotateClipboardAsk = string(
+      "preferences-capture.annotate-clipboard-ask",
+      defaultValue: "Ask every time",
+      comment: "Picker option for asking before loading a clipboard image into Annotate"
+    )
+    static let annotateClipboardLoadAutomatically = string(
+      "preferences-capture.annotate-clipboard-load-automatically",
+      defaultValue: "Load automatically",
+      comment: "Picker option for automatically loading a clipboard image into Annotate"
+    )
+    static let annotateClipboardDoNothing = string(
+      "preferences-capture.annotate-clipboard-do-nothing",
+      defaultValue: "Do nothing",
+      comment: "Picker option for not loading a clipboard image into Annotate"
     )
     static let hideDesktopIconsTitle = string(
       "preferences-capture.hide-desktop-icons-title",
@@ -3623,6 +3653,31 @@ enum L10n {
       "annotate.new-window",
       defaultValue: "New Annotate Window",
       comment: "Tooltip shown for opening another independent annotate window"
+    )
+    static let clipboardImagePromptTitle = string(
+      "annotate.clipboard-image-prompt-title",
+      defaultValue: "Load Clipboard Image?",
+      comment: "Alert title shown when opening Annotate with an image in the clipboard"
+    )
+    static let clipboardImagePromptMessage = string(
+      "annotate.clipboard-image-prompt-message",
+      defaultValue: "Annotate found an image in your clipboard. Load it onto the canvas?",
+      comment: "Alert message shown when opening Annotate with an image in the clipboard"
+    )
+    static let loadImageButton = string(
+      "annotate.load-image-button",
+      defaultValue: "Load Image",
+      comment: "Button title for loading a clipboard image into Annotate"
+    )
+    static let notNowButton = string(
+      "annotate.not-now-button",
+      defaultValue: "Not Now",
+      comment: "Button title for skipping clipboard image loading"
+    )
+    static let dontAskAgain = string(
+      "annotate.dont-ask-again",
+      defaultValue: "Don't ask again",
+      comment: "Checkbox label for remembering the clipboard image prompt choice"
     )
     static let uploadedToCloud = string(
       "annotate.uploaded-to-cloud",

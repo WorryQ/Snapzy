@@ -50,6 +50,7 @@ enum PreferencesKeys {
   static let backgroundCutoutAutoCropEnabled = "backgroundCutout.autoCropEnabled"
   static let annotateCanvasPresets = "annotate.canvasPresets.v1"
   static let annotateDefaultCanvasPresetId = "annotate.defaultCanvasPresetId.v1"
+  static let annotateClipboardImageOpenBehavior = "annotate.clipboardImageOpenBehavior"
   static let annotatePrimaryColor = "annotate.primaryColor.v1"
   static let annotateParameterDefaults = "annotate.parameterDefaults.v1"
   static let annotateCustomColors = "annotate.customColors.v1"

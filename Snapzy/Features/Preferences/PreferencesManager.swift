@@ -42,6 +42,38 @@ enum CaptureType: String, CaseIterable, Codable {
   }
 }
 
+/// Behavior for importing clipboard images when opening an empty Annotate editor.
+enum AnnotateClipboardImageBehavior: String, CaseIterable, Identifiable {
+  case ask = "ask"
+  case loadAutomatically = "loadAutomatically"
+  case doNothing = "doNothing"
+
+  var id: String { rawValue }
+
+  var displayName: String {
+    switch self {
+    case .ask:
+      return L10n.PreferencesCapture.annotateClipboardAsk
+    case .loadAutomatically:
+      return L10n.PreferencesCapture.annotateClipboardLoadAutomatically
+    case .doNothing:
+      return L10n.PreferencesCapture.annotateClipboardDoNothing
+    }
+  }
+
+  static func stored(userDefaults: UserDefaults = .standard) -> Self {
+    guard let rawValue = userDefaults.string(forKey: PreferencesKeys.annotateClipboardImageOpenBehavior),
+          let behavior = Self(rawValue: rawValue) else {
+      return .ask
+    }
+    return behavior
+  }
+
+  func persist(to userDefaults: UserDefaults = .standard) {
+    userDefaults.set(rawValue, forKey: PreferencesKeys.annotateClipboardImageOpenBehavior)
+  }
+}
+
 /// Manager for complex preferences that require more than simple @AppStorage
 @MainActor
 final class PreferencesManager: ObservableObject {

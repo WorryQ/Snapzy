@@ -224,6 +224,7 @@ final class AnnotateManager {
     }
 
     controller.showWindow()
+    controller.handleManualOpenClipboardImageBehavior()
   }
 
   // MARK: - Session Cache

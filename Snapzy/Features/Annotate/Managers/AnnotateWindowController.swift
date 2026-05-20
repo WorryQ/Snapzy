@@ -275,6 +275,134 @@ final class AnnotateWindowController: NSWindowController, NSWindowDelegate {
     state.cloudURL != nil && (state.requiresRenderedOutputForSharing || state.isCloudStale)
   }
 
+  private enum PasteboardImageCandidate {
+    case file(URL)
+    case data(NSImage, Data)
+    case image(NSImage)
+  }
+
+  private static let pasteboardRawImageTypes: [NSPasteboard.PasteboardType] = [
+    .png,
+    .tiff,
+    NSPasteboard.PasteboardType(UTType.jpeg.identifier),
+    NSPasteboard.PasteboardType(UTType.gif.identifier),
+    NSPasteboard.PasteboardType(UTType.bmp.identifier),
+    NSPasteboard.PasteboardType(UTType.heic.identifier),
+    NSPasteboard.PasteboardType(UTType.webP.identifier),
+  ]
+
+  private static func hasPasteboardImage(_ pasteboard: NSPasteboard) -> Bool {
+    !pasteboardImageCandidates(from: pasteboard).isEmpty
+  }
+
+  private static func pasteboardImageCandidates(from pasteboard: NSPasteboard) -> [PasteboardImageCandidate] {
+    if let firstItem = pasteboard.pasteboardItems?.first {
+      let directCandidates = pasteboardImageCandidates(from: firstItem)
+      if !directCandidates.isEmpty {
+        return directCandidates
+      }
+    }
+
+    var candidates: [PasteboardImageCandidate] = []
+    let pastedURLs = pasteboard.readObjects(
+      forClasses: [NSURL.self],
+      options: [.urlReadingFileURLsOnly: true]
+    )
+
+    if let imageURLs = (pastedURLs as? [URL]) ?? (pastedURLs as? [NSURL])?.map({ $0 as URL }) {
+      for imageURL in imageURLs where AnnotateCanvasView.isValidImageFile(url: imageURL) {
+        candidates.append(.file(imageURL))
+      }
+    }
+
+    if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+       let image = images.first {
+      candidates.append(.image(image))
+    }
+
+    return candidates
+  }
+
+  private static func pasteboardImageCandidates(from item: NSPasteboardItem) -> [PasteboardImageCandidate] {
+    var candidates: [PasteboardImageCandidate] = []
+
+    if let fileURL = fileURL(from: item),
+       AnnotateCanvasView.isValidImageFile(url: fileURL) {
+      candidates.append(.file(fileURL))
+    }
+
+    for rawType in pasteboardRawImageTypes {
+      guard let data = item.data(forType: rawType),
+            let image = NSImage(data: data) else { continue }
+      candidates.append(.data(image, data))
+    }
+
+    return candidates
+  }
+
+  private static func fileURL(from item: NSPasteboardItem) -> URL? {
+    guard let value = item.string(forType: .fileURL) else { return nil }
+    if let url = URL(string: value), url.isFileURL {
+      return url
+    }
+    guard value.hasPrefix("/") else { return nil }
+    return URL(fileURLWithPath: value)
+  }
+
+  // MARK: - Manual Open Clipboard Import
+
+  func handleManualOpenClipboardImageBehavior() {
+    let behavior = AnnotateClipboardImageBehavior.stored()
+    guard behavior != .doNothing else { return }
+    guard Self.hasPasteboardImage(NSPasteboard.general) else { return }
+
+    switch behavior {
+    case .ask:
+      showClipboardImagePrompt()
+    case .loadAutomatically:
+      performPasteImage(beepOnFailure: false)
+    case .doNothing:
+      break
+    }
+  }
+
+  private func showClipboardImagePrompt() {
+    guard let window = self.window else { return }
+
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = L10n.AnnotateUI.clipboardImagePromptTitle
+    alert.informativeText = L10n.AnnotateUI.clipboardImagePromptMessage
+
+    let loadButton = alert.addButton(withTitle: L10n.AnnotateUI.loadImageButton)
+    loadButton.keyEquivalent = "\r"
+
+    let notNowButton = alert.addButton(withTitle: L10n.AnnotateUI.notNowButton)
+    notNowButton.keyEquivalent = "\u{1B}"
+
+    alert.showsSuppressionButton = true
+    alert.suppressionButton?.title = L10n.AnnotateUI.dontAskAgain
+
+    alert.beginSheetModal(for: window) { [weak self] response in
+      guard let self else { return }
+
+      let shouldRemember = alert.suppressionButton?.state == .on
+      switch response {
+      case .alertFirstButtonReturn:
+        if shouldRemember {
+          AnnotateClipboardImageBehavior.loadAutomatically.persist()
+        }
+        self.performPasteImage()
+      case .alertSecondButtonReturn:
+        if shouldRemember {
+          AnnotateClipboardImageBehavior.doNothing.persist()
+        }
+      default:
+        break
+      }
+    }
+  }
+
   // MARK: - NSWindowDelegate
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -407,7 +535,7 @@ final class AnnotateWindowController: NSWindowController, NSWindowDelegate {
       queue: .main
     ) { [weak self] _ in
       MainActor.assumeIsolated {
-        self?.performPasteImage()
+        _ = self?.performPasteImage()
       }
     }
 
@@ -527,38 +655,29 @@ final class AnnotateWindowController: NSWindowController, NSWindowDelegate {
     state.isPinned = newPinned
   }
 
-  private func performPasteImage() {
-    let pasteboard = NSPasteboard.general
-
-    let pastedURLs = pasteboard.readObjects(
-      forClasses: [NSURL.self],
-      options: [.urlReadingFileURLsOnly: true]
-    )
-
-    if let imageURLs = (pastedURLs as? [URL]) ?? (pastedURLs as? [NSURL])?.map({ $0 as URL }) {
-      for imageURL in imageURLs where AnnotateCanvasView.isValidImageFile(url: imageURL) {
-        if state.importImage(from: imageURL) {
-          return
-        }
+  @discardableResult
+  private func performPasteImage(beepOnFailure: Bool = true) -> Bool {
+    for candidate in Self.pasteboardImageCandidates(from: NSPasteboard.general) {
+      if importPasteboardImage(candidate) {
+        return true
       }
     }
 
-    let rawTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
-    for rawType in rawTypes {
-      guard let data = pasteboard.data(forType: rawType),
-            let image = NSImage(data: data) else { continue }
-      if state.importImage(image, sourceURL: nil, sourceData: data) {
-        return
-      }
+    if beepOnFailure {
+      NSSound.beep()
     }
+    return false
+  }
 
-    if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
-       let image = images.first,
-       state.importImage(image, sourceURL: nil) {
-      return
+  private func importPasteboardImage(_ candidate: PasteboardImageCandidate) -> Bool {
+    switch candidate {
+    case .file(let url):
+      return state.importImage(from: url)
+    case .data(let image, let data):
+      return state.importImage(image, sourceURL: nil, sourceData: data)
+    case .image(let image):
+      return state.importImage(image, sourceURL: nil)
     }
-
-    NSSound.beep()
   }
 
   /// Silent save — renders once, updates thumbnail instantly, closes window, saves in background

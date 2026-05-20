@@ -32,6 +32,20 @@ final class PreferencesCoreTests: XCTestCase {
     XCTAssertEqual(HistoryBackgroundStyle.currentStoredStyle(userDefaults: defaults), .hud)
   }
 
+  func testAnnotateClipboardImageBehaviorStored_readsValidValueAndFallsBackToAsk() throws {
+    let defaults = try makeDefaults()
+    XCTAssertEqual(AnnotateClipboardImageBehavior.stored(userDefaults: defaults), .ask)
+
+    defaults.set(
+      AnnotateClipboardImageBehavior.loadAutomatically.rawValue,
+      forKey: PreferencesKeys.annotateClipboardImageOpenBehavior
+    )
+    XCTAssertEqual(AnnotateClipboardImageBehavior.stored(userDefaults: defaults), .loadAutomatically)
+
+    defaults.set("invalid", forKey: PreferencesKeys.annotateClipboardImageOpenBehavior)
+    XCTAssertEqual(AnnotateClipboardImageBehavior.stored(userDefaults: defaults), .ask)
+  }
+
   func testPreferencesTabsRemainUniqueAndHashable() {
     let tabs: Set<PreferencesTab> = [
       .general,
