@@ -56,6 +56,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+
+## [1.17.1] - 2026-05-21
+
+### Chore
+- chore: Allow optional size for color swatch buttons and custom color picker (752bf24)
+- chore: Add build and run script for Snapzy (306409b)
+- chore: update appcast, cask, and readme for v1.17.0 (384851a)
+
+### Contributors
+- @duongductrong
+- @github-actions[bot]
+
 ## [1.17.0] - 2026-05-20
 
 ### Features
