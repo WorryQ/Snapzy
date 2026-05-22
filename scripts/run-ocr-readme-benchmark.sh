@@ -29,6 +29,8 @@ swiftc -module-cache-path "$MODULE_CACHE_PATH" \
   -o "$BINARY_PATH" \
   scripts/swift-tools/ocr/ocr-readme-benchmark.swift \
   Snapzy/Services/Media/OCRService.swift \
+  Snapzy/Services/Media/OCR/VerticalCJKTextNormalizer.swift \
+  Snapzy/Services/Media/OCR/VerticalCJKBitmapAnalysis.swift \
   Snapzy/Services/Media/OCR/OCRRequest.swift \
   Snapzy/Services/Media/OCR/OCRResult.swift \
   Snapzy/Services/Media/OCR/VisionOCRProfile.swift \

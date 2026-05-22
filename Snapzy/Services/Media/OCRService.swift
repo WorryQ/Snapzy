@@ -97,6 +97,43 @@ final class OCRService {
       }
     }
 
+    if request.contentType != .code, let verticalImage = VerticalCJKTextNormalizer.normalizedImage(from: request.image) {
+      let verticalRequest = OCRRequest(
+        image: verticalImage,
+        preferredLanguageIdentifier: request.preferredLanguageIdentifier,
+        contentType: request.contentType
+      )
+      let verticalProfiles = uniqueProfiles(
+        [profile]
+          + VisionOCRProfile.recoveryProfiles(for: request, primary: profile)
+          + VisionOCRProfile.enhancedRecoveryProfiles(for: request, primary: profile)
+      )
+
+      DiagnosticLogger.shared.log(
+        .info,
+        .ocr,
+        "OCR vertical CJK recovery started",
+        context: [
+          "sourceProfile": profile.id,
+          "sourceSize": "\(request.image.width)x\(request.image.height)",
+          "normalizedSize": "\(verticalImage.width)x\(verticalImage.height)",
+          "profiles": verticalProfiles.map(\.id).joined(separator: ",")
+        ]
+      )
+
+      let verticalPass = await runRecognitionPass(
+        for: verticalRequest,
+        profiles: verticalProfiles,
+        languageContext: "\(languageContext)+vertical-cjk"
+      )
+
+      bestCandidate = betterCandidate(bestCandidate, than: verticalPass.bestCandidate)
+      if let acceptedResult = verticalPass.acceptedResult {
+        return acceptedResult
+      }
+      lastError = verticalPass.lastError ?? lastError
+    }
+
     if let bestCandidate {
       DiagnosticLogger.shared.log(
         .warning,
