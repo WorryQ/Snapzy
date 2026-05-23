@@ -332,7 +332,12 @@ final class ScrollingCaptureSessionModel: ObservableObject {
   }
 
   var canToggleAutoScroll: Bool {
-    phase == .capturing && !isInteractionLocked && (isAutoScrolling || acceptedFrameCount > 0)
+    switch phase {
+    case .capturing:
+      return isAutoScrolling || acceptedFrameCount > 0
+    case .ready, .finalizing, .saving:
+      return false
+    }
   }
 
   var isShowingLiveViewport: Bool {

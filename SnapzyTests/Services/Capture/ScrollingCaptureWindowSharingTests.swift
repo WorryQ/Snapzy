@@ -56,22 +56,42 @@ final class ScrollingCaptureWindowSharingTests: XCTestCase {
   }
 
   func testSessionModel_canToggleAutoScrollOnlyAfterFirstFrameLocks() {
-    let model = ScrollingCaptureSessionModel(selectedRect: sampleAnchorRect)
-
-    XCTAssertFalse(model.canToggleAutoScroll)
-
-    model.phase = .capturing
-    XCTAssertFalse(model.canToggleAutoScroll)
-
-    model.acceptedFrameCount = 1
-    XCTAssertTrue(model.canToggleAutoScroll)
-
-    model.isAutoScrolling = true
-    model.acceptedFrameCount = 0
-    XCTAssertTrue(model.canToggleAutoScroll)
-
-    model.phase = .finalizing
-    XCTAssertFalse(model.canToggleAutoScroll)
+    assertCanToggleAutoScroll(
+      phase: .ready,
+      acceptedFrameCount: 0,
+      isAutoScrolling: false,
+      expected: false
+    )
+    assertCanToggleAutoScroll(
+      phase: .capturing,
+      acceptedFrameCount: 0,
+      isAutoScrolling: false,
+      expected: false
+    )
+    assertCanToggleAutoScroll(
+      phase: .capturing,
+      acceptedFrameCount: 1,
+      isAutoScrolling: false,
+      expected: true
+    )
+    assertCanToggleAutoScroll(
+      phase: .capturing,
+      acceptedFrameCount: 0,
+      isAutoScrolling: true,
+      expected: true
+    )
+    assertCanToggleAutoScroll(
+      phase: .finalizing,
+      acceptedFrameCount: 1,
+      isAutoScrolling: true,
+      expected: false
+    )
+    assertCanToggleAutoScroll(
+      phase: .saving,
+      acceptedFrameCount: 1,
+      isAutoScrolling: true,
+      expected: false
+    )
   }
 
   func testPlaceMouseInsideSelectionGuidance_usesWarningTone() {
@@ -160,6 +180,28 @@ final class ScrollingCaptureWindowSharingTests: XCTestCase {
 
   private var sampleAnchorRect: CGRect {
     CGRect(x: 120, y: 120, width: 360, height: 480)
+  }
+
+  private func assertCanToggleAutoScroll(
+    phase: ScrollingCapturePhase,
+    acceptedFrameCount: Int,
+    isAutoScrolling: Bool,
+    expected: Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let model = ScrollingCaptureSessionModel(selectedRect: sampleAnchorRect)
+    model.phase = phase
+    model.acceptedFrameCount = acceptedFrameCount
+    model.isAutoScrolling = isAutoScrolling
+
+    XCTAssertEqual(
+      model.canToggleAutoScroll,
+      expected,
+      "phase=\(phase), acceptedFrameCount=\(acceptedFrameCount), isAutoScrolling=\(isAutoScrolling)",
+      file: file,
+      line: line
+    )
   }
 
   private func stitchUpdate(
