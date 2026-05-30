@@ -11,7 +11,28 @@ import XCTest
 @MainActor
 final class TempCaptureManagerTests: XCTestCase {
 
+  private final class FakeSandboxFileAccess: SandboxFileAccessing {
+    let exportDirectory: URL
+
+    init(exportDirectory: URL) {
+      self.exportDirectory = exportDirectory
+    }
+
+    func resolvedExportDirectoryURL() -> URL {
+      exportDirectory
+    }
+
+    func beginAccessingURL(_ targetURL: URL) -> SandboxFileAccessManager.ScopedAccess {
+      SandboxFileAccessManager.ScopedAccess(
+        url: targetURL,
+        accessURL: targetURL,
+        didStartAccessing: false
+      )
+    }
+  }
+
   private var fakePreferences: FakePreferencesProvider!
+  private var fakeFileAccess: FakeSandboxFileAccess!
   private var defaults: UserDefaults!
   private var manager: TempCaptureManager!
   private var testFiles: [URL] = []
@@ -19,12 +40,17 @@ final class TempCaptureManagerTests: XCTestCase {
   override func setUp() {
     super.setUp()
     fakePreferences = FakePreferencesProvider()
+    let exportDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("SnapzyTests_Export_\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: exportDirectory, withIntermediateDirectories: true)
+    fakeFileAccess = FakeSandboxFileAccess(exportDirectory: exportDirectory)
     defaults = UserDefaultsFactory.make()
     manager = TempCaptureManager(
       preferences: fakePreferences,
-      fileAccess: SandboxFileAccessManager.shared,
+      fileAccess: fakeFileAccess,
       defaults: defaults
     )
+    testFiles.append(exportDirectory)
   }
 
   override func tearDown() async throws {
@@ -41,6 +67,10 @@ final class TempCaptureManagerTests: XCTestCase {
     name: String = "test_\(UUID().uuidString).png"
   ) throws -> URL {
     let url = manager.tempCaptureDirectory.appendingPathComponent(name)
+    try FileManager.default.createDirectory(
+      at: url.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
     try Data("test".utf8).write(to: url)
     testFiles.append(url)
     return url
@@ -75,6 +105,36 @@ final class TempCaptureManagerTests: XCTestCase {
     XCTAssertTrue(manager.isTempFile(url))
   }
 
+  func testIsTempFile_siblingPathWithSamePrefix_returnsFalse() throws {
+    let siblingDir = URL(fileURLWithPath: manager.tempCaptureDirectory.path + "_Sibling", isDirectory: true)
+    try FileManager.default.createDirectory(at: siblingDir, withIntermediateDirectories: true)
+    let url = siblingDir.appendingPathComponent("not_temp.png")
+    try Data("test".utf8).write(to: url)
+    testFiles.append(siblingDir)
+
+    XCTAssertFalse(manager.isTempFile(url))
+  }
+
+  // MARK: - saveToExportLocation
+
+  func testSaveToExportLocation_nestedTempFile_preservesRelativeSubfolder() throws {
+    let tempURL = try createTempTestFile(name: "Shots/May/nested.png")
+    testFiles.append(manager.tempCaptureDirectory.appendingPathComponent("Shots", isDirectory: true))
+
+    let savedURL = manager.saveToExportLocation(tempURL: tempURL)
+
+    let expectedURL = fakeFileAccess.exportDirectory
+      .appendingPathComponent("Shots/May/nested.png")
+    XCTAssertEqual(savedURL?.path, expectedURL.path)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: expectedURL.path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: manager.tempCaptureDirectory.appendingPathComponent("Shots").path
+      )
+    )
+  }
+
   // MARK: - deleteTempFile
 
   func testDeleteTempFile_removesFileFromDisk() throws {
@@ -96,6 +156,17 @@ final class TempCaptureManagerTests: XCTestCase {
     // File should still exist — not in temp dir
     XCTAssertTrue(existedBefore)
     XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+  }
+
+  func testDeleteTempFile_nestedTempFile_prunesEmptySubfolders() throws {
+    let url = try createTempTestFile(name: "DeleteMe/May/nested.png")
+    let rootSubfolder = manager.tempCaptureDirectory.appendingPathComponent("DeleteMe", isDirectory: true)
+    testFiles.append(rootSubfolder)
+
+    manager.deleteTempFile(at: url)
+
+    XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: rootSubfolder.path))
   }
 
   func testDeleteTempFile_nonexistentFile_doesNotCrash() {

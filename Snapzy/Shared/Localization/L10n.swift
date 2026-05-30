@@ -2392,7 +2392,7 @@ enum L10n {
     )
     static let screenshotTemplateDescription = string(
       "preferences-capture.screenshot-template-description",
-      defaultValue: "Pattern for auto-saved screenshot filename",
+      defaultValue: "Pattern for auto-saved screenshot filename or subfolder path",
       comment: "Capture preferences setting description"
     )
     static let recordingTemplateTitle = string(
@@ -2402,12 +2402,12 @@ enum L10n {
     )
     static let recordingTemplateDescription = string(
       "preferences-capture.recording-template-description",
-      defaultValue: "Pattern for auto-saved recording filename",
+      defaultValue: "Pattern for auto-saved recording filename or subfolder path",
       comment: "Capture preferences setting description"
     )
     static let availableTokens = string(
       "preferences-capture.available-tokens",
-      defaultValue: "Available tokens: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}",
+      defaultValue: "Available tokens: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Use / to create subfolders.",
       comment: "Informational text listing available filename template tokens"
     )
     static func screenshotPreview(_ preview: String) -> String {

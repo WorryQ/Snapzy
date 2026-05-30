@@ -587,19 +587,25 @@ struct CaptureSettingsView: View {
   // MARK: - Helpers
 
   private var screenshotFilenamePreview: String {
-    let baseName = CaptureOutputNaming.resolveBaseName(
-      customName: screenshotFileNameTemplate,
+    let baseName = CaptureOutputNaming.resolveTemplateBaseName(
+      previewTemplate(screenshotFileNameTemplate, kind: .screenshot),
       kind: .screenshot
     )
     return "\(baseName).\(screenshotFileExtension)"
   }
 
   private var recordingFilenamePreview: String {
-    let baseName = CaptureOutputNaming.resolveBaseName(
-      customName: recordingFileNameTemplate,
+    let baseName = CaptureOutputNaming.resolveTemplateBaseName(
+      previewTemplate(recordingFileNameTemplate, kind: .recording),
       kind: .recording
     )
     return "\(baseName).\(recordingFileExtension)"
+  }
+
+  private func previewTemplate(_ template: String, kind: CaptureOutputKind) -> String {
+    template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      ? kind.defaultTemplate
+      : template
   }
 
   private var screenshotFileExtension: String {

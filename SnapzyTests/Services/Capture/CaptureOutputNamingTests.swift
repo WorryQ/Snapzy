@@ -151,19 +151,144 @@ final class CaptureOutputNamingTests: XCTestCase {
     XCTAssertEqual(result, expected)
   }
 
+  func testResolveBaseName_yearMonthDayTokens() {
+    defaults.set("{year}/{month}/{day}/shot", forKey: PreferencesKeys.screenshotFileNameTemplate)
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    let localDate = calendar.date(from: DateComponents(
+      year: 2026,
+      month: 1,
+      day: 15,
+      hour: 14,
+      minute: 30,
+      second: 45
+    ))!
+
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: nil,
+      kind: .screenshot,
+      date: localDate,
+      defaults: defaults
+    )
+
+    XCTAssertEqual(result, "2026/01/15/shot")
+  }
+
+  func testResolveBaseName_yearShortTokens() {
+    defaults.set("{year}/{yearShort}/{year_short}/{yy}/shot", forKey: PreferencesKeys.screenshotFileNameTemplate)
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    let localDate = calendar.date(from: DateComponents(
+      year: 2026,
+      month: 1,
+      day: 15,
+      hour: 14,
+      minute: 30,
+      second: 45
+    ))!
+
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: nil,
+      kind: .screenshot,
+      date: localDate,
+      defaults: defaults
+    )
+
+    XCTAssertEqual(result, "2026/26/26/26/shot")
+  }
+
+  func testResolveBaseName_monthNameTokens() {
+    defaults.set(
+      "{year}/{monthName}/{monthShort}/{month_name}/{month_short}/shot",
+      forKey: PreferencesKeys.screenshotFileNameTemplate
+    )
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    let localDate = calendar.date(from: DateComponents(
+      year: 2026,
+      month: 1,
+      day: 15,
+      hour: 14,
+      minute: 30,
+      second: 45
+    ))!
+    let monthName = CaptureOutputNaming.resolveBaseName(
+      customName: Self.format(localDate, style: "MMMM"),
+      kind: .screenshot,
+      date: localDate,
+      defaults: defaults
+    )
+    let monthShort = CaptureOutputNaming.resolveBaseName(
+      customName: Self.format(localDate, style: "MMM"),
+      kind: .screenshot,
+      date: localDate,
+      defaults: defaults
+    )
+
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: nil,
+      kind: .screenshot,
+      date: localDate,
+      defaults: defaults
+    )
+
+    XCTAssertEqual(result, "2026/\(monthName)/\(monthShort)/\(monthName)/\(monthShort)/shot")
+  }
+
+  func testResolveBaseName_templateWithSlash_returnsRelativeSubpath() {
+    defaults.set("{type}/{timestamp}/shot_{ms}", forKey: PreferencesKeys.screenshotFileNameTemplate)
+
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: nil,
+      kind: .screenshot,
+      date: fixedDate,
+      defaults: defaults
+    )
+
+    XCTAssertEqual(result, "screenshot/\(Int(fixedDate.timeIntervalSince1970))/shot_123")
+  }
+
+  func testResolveTemplateBaseName_returnsPreviewSubpath() {
+    let result = CaptureOutputNaming.resolveTemplateBaseName(
+      "Shots/{timestamp}/Snapzy_{ms}",
+      kind: .screenshot,
+      date: fixedDate
+    )
+
+    XCTAssertEqual(result, "Shots/\(Int(fixedDate.timeIntervalSince1970))/Snapzy_123")
+  }
+
+  private static func format(_ date: Date, style: String) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = style
+    return formatter.string(from: date)
+  }
+
   // MARK: - Sanitization
 
-  func testSanitize_invalidFilenameCharacters_replacedWithUnderscore() {
+  func testSanitize_slashCreatesSubpathAndInvalidFilenameCharactersUseUnderscore() {
     let result = CaptureOutputNaming.resolveBaseName(
       customName: "file/with\\bad:chars?test",
       kind: .screenshot,
       date: fixedDate,
       defaults: defaults
     )
-    XCTAssertFalse(result.contains("/"))
+    XCTAssertEqual(result, "file/with_bad_chars_test")
+    XCTAssertTrue(result.contains("/"))
     XCTAssertFalse(result.contains("\\"))
     XCTAssertFalse(result.contains(":"))
     XCTAssertFalse(result.contains("?"))
+  }
+
+  func testSanitize_pathTraversalComponents_areDropped() {
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: "../Shots//./2026:May/final.png",
+      kind: .screenshot,
+      date: fixedDate,
+      defaults: defaults
+    )
+    XCTAssertEqual(result, "Shots/2026_May/final")
+    XCTAssertFalse(result.contains(".."))
   }
 
   func testSanitize_consecutiveUnderscores_collapsed() {
@@ -195,6 +320,16 @@ final class CaptureOutputNamingTests: XCTestCase {
       defaults: defaults
     )
     XCTAssertEqual(result, "capture")
+  }
+
+  func testSanitize_knownExtension_strippedFromLeafOnly() {
+    let result = CaptureOutputNaming.resolveBaseName(
+      customName: "Screenshots.png/capture.jpeg",
+      kind: .screenshot,
+      date: fixedDate,
+      defaults: defaults
+    )
+    XCTAssertEqual(result, "Screenshots.png/capture")
   }
 
   func testSanitize_unknownExtension_preserved() {
@@ -252,6 +387,62 @@ final class CaptureOutputNamingTests: XCTestCase {
       fileExtension: "png"
     )
     XCTAssertEqual(result.lastPathComponent, "shot_3.png")
+  }
+
+  func testMakeUniqueFileURL_withNestedBaseName_returnsSubfolderURL() {
+    let result = CaptureOutputNaming.makeUniqueFileURL(
+      in: tempDirectory,
+      baseName: "Shots/May/shot",
+      fileExtension: "png"
+    )
+
+    let expected = tempDirectory
+      .appendingPathComponent("Shots/May/shot.png")
+    XCTAssertEqual(result.path, expected.path)
+  }
+
+  func testMakeUniqueFileURL_withNestedCollision_appendsSuffixToLeaf() throws {
+    let nestedDirectory = tempDirectory
+      .appendingPathComponent("Shots/May", isDirectory: true)
+    try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+    try Data("test".utf8).write(to: nestedDirectory.appendingPathComponent("shot.png"))
+    try Data("test".utf8).write(to: nestedDirectory.appendingPathComponent("shot_2.png"))
+
+    let result = CaptureOutputNaming.makeUniqueFileURL(
+      in: tempDirectory,
+      baseName: "Shots/May/shot",
+      fileExtension: "png"
+    )
+
+    XCTAssertEqual(result.lastPathComponent, "shot_3.png")
+    XCTAssertEqual(result.deletingLastPathComponent().lastPathComponent, "May")
+  }
+
+  @MainActor
+  func testSaveProcessedImage_withNestedFileName_createsParentDirectory() async throws {
+    let image = try XCTUnwrap(TestImageFactory.solidColor(width: 2, height: 2))
+    let baseName = CaptureOutputNaming.resolveBaseName(
+      customName: "Runtime/Subfolder/shot",
+      kind: .screenshot,
+      date: fixedDate,
+      defaults: defaults
+    )
+
+    let result = await ScreenCaptureManager.shared.saveProcessedImage(
+      image,
+      to: tempDirectory,
+      fileName: baseName,
+      format: .png
+    )
+
+    guard case .success(let url) = result else {
+      XCTFail("Expected nested screenshot save to succeed, got \(result)")
+      return
+    }
+
+    let expectedURL = tempDirectory.appendingPathComponent("Runtime/Subfolder/shot.png")
+    XCTAssertEqual(url.path, expectedURL.path)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: expectedURL.path))
   }
 
   // MARK: - resolvedTemplate

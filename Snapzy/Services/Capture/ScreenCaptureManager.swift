@@ -1004,7 +1004,10 @@ final class ScreenCaptureManager: ObservableObject {
     let writeResult: Result<URL, CaptureError> = await Task.detached {
       // Create directory if needed
       do {
-        try FileManager.default.createDirectory(at: scopedDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+          at: fileURL.deletingLastPathComponent(),
+          withIntermediateDirectories: true
+        )
       } catch {
         return .failure(.saveFailed(L10n.ScreenCapture.couldNotCreateDirectory(error.localizedDescription)))
       }

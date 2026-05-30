@@ -841,6 +841,22 @@ final class ScreenRecordingManager: NSObject, ObservableObject {
       baseName: resolvedFileName,
       fileExtension: format.fileExtension
     )
+    if let finalOutputURL {
+      do {
+        try FileManager.default.createDirectory(
+          at: finalOutputURL.deletingLastPathComponent(),
+          withIntermediateDirectories: true
+        )
+      } catch {
+        DiagnosticLogger.shared.logError(.recording, error, "Failed to create recording output subdirectory")
+        cleanupRecordingProcessingDirectoryIfNeeded()
+        exportDirectoryAccess?.stop()
+        exportDirectoryAccess = nil
+        state = .idle
+        self.error = .writeFailed(error.localizedDescription)
+        throw RecordingError.writeFailed(error.localizedDescription)
+      }
+    }
     let writerBaseName = finalOutputURL?.deletingPathExtension().lastPathComponent ?? resolvedFileName
     outputURL = CaptureOutputNaming.makeUniqueFileURL(
       in: writerDirectory,

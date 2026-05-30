@@ -84,6 +84,14 @@ Unknown keys are ignored. Known keys are validated by type and allowed value.
 If import finds any error, Snapzy applies none of the changes. Warnings do not
 block import.
 
+Capture naming templates support `{datetime}`, `{date}`, `{year}`,
+`{yearShort}`, `{month}`, `{monthName}`, `{monthShort}`, `{day}`, `{time}`,
+`{ms}`, `{timestamp}`, and `{type}`. Use `/` to create subfolders under the
+selected export folder; each path segment is sanitized and traversal segments
+are ignored.
+`{year_short}`, `{yy}`, `{month_name}`, and `{month_short}` are also accepted
+as aliases.
+
 ## Example
 
 ```toml
@@ -102,8 +110,8 @@ hide_desktop_icons = false
 hide_desktop_widgets = false
 
 [capture.naming]
-screenshot_template = "Screenshot {yyyy}-{MM}-{dd} at {HH}.{mm}.{ss}"
-recording_template = "Recording {yyyy}-{MM}-{dd} at {HH}.{mm}.{ss}"
+screenshot_template = "Screenshots/{yearShort}/{monthName}/{day}/Snapzy_{time}_{ms}"
+recording_template = "Recordings/{year}/{monthShort}/Snapzy_Recording_{day}_{time}"
 
 [capture.screenshot]
 format = "png"

@@ -40,7 +40,7 @@ enum CaptureOutputKind {
 }
 
 enum CaptureOutputNaming {
-  private static let invalidFilenameCharacters = CharacterSet(charactersIn: "/\\:?%*|\"<>\n\r\t")
+  private static let invalidPathComponentCharacters = CharacterSet(charactersIn: "\\:?%*|\"<>\n\r\t")
   private static let knownExtensions: Set<String> = ["png", "jpg", "jpeg", "webp", "mov", "mp4", "gif"]
 
   static func resolveBaseName(
@@ -57,13 +57,7 @@ enum CaptureOutputNaming {
     }
 
     let template = resolvedTemplate(for: kind, defaults: defaults)
-    let parsed = parseTemplate(template, kind: kind, date: date)
-    let sanitizedParsed = sanitizeBaseName(parsed)
-    if !sanitizedParsed.isEmpty {
-      return sanitizedParsed
-    }
-
-    return fallbackName(for: kind, date: date)
+    return resolveTemplateBaseName(template, kind: kind, date: date)
   }
 
   static func resolvedTemplate(for kind: CaptureOutputKind, defaults: UserDefaults = .standard) -> String {
@@ -73,6 +67,20 @@ enum CaptureOutputNaming {
 
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? kind.defaultTemplate : trimmed
+  }
+
+  static func resolveTemplateBaseName(
+    _ template: String,
+    kind: CaptureOutputKind,
+    date: Date = Date()
+  ) -> String {
+    let parsed = parseTemplate(template, kind: kind, date: date)
+    let sanitizedParsed = sanitizeBaseName(parsed)
+    if !sanitizedParsed.isEmpty {
+      return sanitizedParsed
+    }
+
+    return fallbackName(for: kind, date: date)
   }
 
   static func makeUniqueFileURL(in directory: URL, baseName: String, fileExtension: String) -> URL {
@@ -91,6 +99,16 @@ enum CaptureOutputNaming {
     var resolved = template
     let replacements: [String: String] = [
       "{type}": kind.typeTokenValue,
+      "{year}": format(date, style: "yyyy"),
+      "{yearShort}": format(date, style: "yy"),
+      "{year_short}": format(date, style: "yy"),
+      "{yy}": format(date, style: "yy"),
+      "{month}": format(date, style: "MM"),
+      "{monthName}": format(date, style: "MMMM"),
+      "{monthShort}": format(date, style: "MMM"),
+      "{month_name}": format(date, style: "MMMM"),
+      "{month_short}": format(date, style: "MMM"),
+      "{day}": format(date, style: "dd"),
       "{date}": format(date, style: "yyyy-MM-dd"),
       "{time}": format(date, style: "HH-mm-ss"),
       "{datetime}": format(date, style: "yyyy-MM-dd_HH-mm-ss"),
@@ -106,13 +124,35 @@ enum CaptureOutputNaming {
   }
 
   private static func sanitizeBaseName(_ value: String) -> String {
+    let components = value
+      .split(separator: "/", omittingEmptySubsequences: true)
+      .map { sanitizePathComponent(String($0)) }
+      .filter { !$0.isEmpty }
+
+    guard !components.isEmpty else { return "" }
+
+    var sanitizedComponents = components
+    sanitizedComponents[sanitizedComponents.count - 1] = stripKnownExtension(
+      from: sanitizedComponents[sanitizedComponents.count - 1]
+    )
+    sanitizedComponents = sanitizedComponents.filter { !$0.isEmpty }
+
+    return sanitizedComponents.joined(separator: "/")
+  }
+
+  private static func sanitizePathComponent(_ value: String) -> String {
     var sanitized = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !sanitized.isEmpty else { return "" }
 
-    sanitized = sanitized.components(separatedBy: invalidFilenameCharacters).joined(separator: "_")
+    sanitized = sanitized.components(separatedBy: invalidPathComponentCharacters).joined(separator: "_")
     sanitized = sanitized.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     sanitized = sanitized.replacingOccurrences(of: "_{2,}", with: "_", options: .regularExpression)
+    sanitized = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+    return sanitized
+  }
 
+  private static func stripKnownExtension(from component: String) -> String {
+    var sanitized = component
     let pathExtension = (sanitized as NSString).pathExtension.lowercased()
     if knownExtensions.contains(pathExtension) {
       sanitized = (sanitized as NSString).deletingPathExtension

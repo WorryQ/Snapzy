@@ -2869,61 +2869,61 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verfügbare Token: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "Verfügbare Token: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Verwende /, um Unterordner zu erstellen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Available tokens: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "Available tokens: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Use / to create subfolders."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tokens disponibles: {fecha y hora}, {fecha}, {hora}, {ms}, {marca de tiempo}, {tipo}"
+            "value" : "Tokens disponibles: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Usa / para crear subcarpetas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jetons disponibles : {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "Jetons disponibles : {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Utilisez / pour créer des sous-dossiers."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "利用可能なトークン: {datetime}、{date}、{time}、{ms}、{timestamp}、{type}"
+            "value" : "利用可能なトークン: {datetime}、{date}、{year}、{yearShort}、{month}、{monthName}、{monthShort}、{day}、{time}、{ms}、{timestamp}、{type}。/ でサブフォルダを作成できます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용 가능한 토큰: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "사용 가능한 토큰: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. /를 사용해 하위 폴더를 만들 수 있습니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Доступные токены: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "Доступные токены: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Используйте / для создания подпапок."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Các token có sẵn: {datetime}, {date}, {time}, {ms}, {timestamp}, {type}"
+            "value" : "Các token có sẵn: {datetime}, {date}, {year}, {yearShort}, {month}, {monthName}, {monthShort}, {day}, {time}, {ms}, {timestamp}, {type}. Dùng / để tạo thư mục con."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可用标记：{datetime}、{date}、{time}、{ms}、{timestamp}、{type}"
+            "value" : "可用标记：{datetime}、{date}、{year}、{yearShort}、{month}、{monthName}、{monthShort}、{day}、{time}、{ms}、{timestamp}、{type}。使用 / 创建子文件夹。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可用標記：{datetime}、{date}、{time}、{ms}、{timestamp}、{type}"
+            "value" : "可用標記：{datetime}、{date}、{year}、{yearShort}、{month}、{monthName}、{monthShort}、{day}、{time}、{ms}、{timestamp}、{type}。使用 / 建立子資料夾。"
           }
         }
       }
@@ -5242,61 +5242,61 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muster für den automatisch gespeicherten Dateinamen der Aufnahme"
+            "value" : "Muster für den automatisch gespeicherten Dateinamen der Aufnahme oder Unterordnerpfad"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pattern for auto-saved recording filename"
+            "value" : "Pattern for auto-saved recording filename or subfolder path"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Patrón para el nombre del archivo de grabación guardado automáticamente"
+            "value" : "Patrón para el nombre de archivo o la ruta de subcarpeta de grabaciones guardadas automáticamente"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle pour le nom de fichier d'enregistrement enregistré automatiquement"
+            "value" : "Modèle pour le nom de fichier ou le chemin de sous-dossier des enregistrements enregistrés automatiquement"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動保存される録音ファイル名のパターン"
+            "value" : "自動保存される録画のファイル名またはサブフォルダパスのパターン"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자동 저장된 녹음 파일 이름 패턴"
+            "value" : "자동 저장된 녹화 파일 이름 또는 하위 폴더 경로 패턴"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Шаблон для автоматически сохраняемого имени файла записи"
+            "value" : "Шаблон для имени файла или пути подпапки автоматически сохраняемой записи"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mẫu tên tệp cho bản ghi được lưu tự động"
+            "value" : "Mẫu tên tệp hoặc đường dẫn thư mục con cho bản ghi được lưu tự động"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自动保存录音文件名的模式"
+            "value" : "自动保存录制文件名或子文件夹路径的模式"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動保存錄音檔案名的模式"
+            "value" : "自動保存錄製檔案名或子資料夾路徑的模式"
           }
         }
       }
@@ -5827,61 +5827,61 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muster für automatisch gespeicherten Screenshot-Dateinamen"
+            "value" : "Muster für automatisch gespeicherten Screenshot-Dateinamen oder Unterordnerpfad"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pattern for auto-saved screenshot filename"
+            "value" : "Pattern for auto-saved screenshot filename or subfolder path"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Patrón para el nombre de archivo de captura de pantalla guardado automáticamente"
+            "value" : "Patrón para el nombre de archivo o la ruta de subcarpeta de capturas guardadas automáticamente"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle pour le nom de fichier de capture d'écran enregistré automatiquement"
+            "value" : "Modèle pour le nom de fichier ou le chemin de sous-dossier des captures d'écran enregistrées automatiquement"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動保存されるスクリーンショットのファイル名のパターン"
+            "value" : "自動保存されるスクリーンショットのファイル名またはサブフォルダパスのパターン"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자동 저장된 스크린샷 파일 이름 패턴"
+            "value" : "자동 저장된 스크린샷 파일 이름 또는 하위 폴더 경로 패턴"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Шаблон для имени файла автоматически сохраняемого скриншота"
+            "value" : "Шаблон для имени файла или пути подпапки автоматически сохраняемого скриншота"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mẫu tên tệp cho ảnh chụp được lưu tự động"
+            "value" : "Mẫu tên tệp hoặc đường dẫn thư mục con cho ảnh chụp được lưu tự động"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自动保存的屏幕截图文件名模式"
+            "value" : "自动保存的屏幕截图文件名或子文件夹路径模式"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動保存的螢幕截圖檔案名模式"
+            "value" : "自動保存的螢幕截圖檔案名或子資料夾路徑模式"
           }
         }
       }

@@ -187,12 +187,22 @@ final class TempCaptureManager {
     let exportAccess = fileAccess.beginAccessingURL(exportDir)
     defer { exportAccess.stop() }
 
-    let destinationURL = exportAccess.url.appendingPathComponent(tempURL.lastPathComponent)
+    guard let relativePath = relativeTempPath(for: tempURL) else {
+      DiagnosticLogger.shared.log(
+        .warning,
+        .fileAccess,
+        "Temp capture save skipped; source has no relative temp path",
+        context: ["fileName": tempURL.lastPathComponent]
+      )
+      return nil
+    }
+
+    let destinationURL = exportAccess.url.appendingPathComponent(relativePath)
 
     do {
       // Create export directory if needed
       try FileManager.default.createDirectory(
-        at: exportAccess.url,
+        at: destinationURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
       )
 
@@ -201,6 +211,7 @@ final class TempCaptureManager {
 
       // Also move recording metadata if it exists (for video files)
       moveRecordingMetadataIfNeeded(from: tempURL, to: destinationURL)
+      pruneEmptyTempDirectories(startingAt: tempURL.deletingLastPathComponent())
 
       logger.info("Saved temp file to export: \(destinationURL.lastPathComponent)")
       DiagnosticLogger.shared.log(
@@ -230,6 +241,7 @@ final class TempCaptureManager {
       try FileManager.default.removeItem(at: url)
       // Also clean up recording metadata if exists
       try? RecordingMetadataStore.delete(for: url)
+      pruneEmptyTempDirectories(startingAt: url.deletingLastPathComponent())
       logger.debug("Deleted temp file: \(url.lastPathComponent)")
       DiagnosticLogger.shared.log(
         .info,
@@ -252,7 +264,7 @@ final class TempCaptureManager {
   func isTempFile(_ url: URL) -> Bool {
     let tempPath = tempCaptureDirectory.standardizedFileURL.path
     let filePath = url.standardizedFileURL.path
-    return filePath.hasPrefix(tempPath)
+    return filePath == tempPath || filePath.hasPrefix(tempPath + "/")
   }
 
   /// Cleanup all orphaned temp files (call on app launch).
@@ -260,14 +272,13 @@ final class TempCaptureManager {
   /// will delete them when the history record ages out.
   func cleanupOrphanedFiles() {
     let fm = FileManager.default
-    let contents: [URL]
-    do {
-      contents = try fm.contentsOfDirectory(
-        at: tempCaptureDirectory,
-        includingPropertiesForKeys: nil
-      )
-    } catch {
-      DiagnosticLogger.shared.logError(.fileAccess, error, "Temp capture startup cleanup failed to list directory")
+
+    guard let enumerator = fm.enumerator(
+      at: tempCaptureDirectory,
+      includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey, .creationDateKey],
+      options: [.skipsHiddenFiles]
+    ) else {
+      DiagnosticLogger.shared.log(.warning, .fileAccess, "Temp capture startup cleanup failed to list directory")
       return
     }
 
@@ -275,8 +286,16 @@ final class TempCaptureManager {
     var count = 0
     var skipped = 0
     var preservedForRetention = 0
+    var directoriesToPrune: [URL] = []
 
-    for fileURL in contents {
+    for case let fileURL as URL in enumerator {
+      guard
+        let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+        values.isRegularFile == true
+      else {
+        continue
+      }
+
       // Skip files referenced by active history records
       if CaptureHistoryStore.shared.hasRecord(forFilePath: fileURL.path) {
         skipped += 1
@@ -294,6 +313,7 @@ final class TempCaptureManager {
       do {
         try fm.removeItem(at: fileURL)
         try? RecordingMetadataStore.delete(for: fileURL)
+        directoriesToPrune.append(fileURL.deletingLastPathComponent())
         count += 1
       } catch {
         logger.error("Failed to cleanup orphan: \(fileURL.lastPathComponent)")
@@ -304,6 +324,10 @@ final class TempCaptureManager {
           context: ["fileName": fileURL.lastPathComponent]
         )
       }
+    }
+
+    for directory in directoriesToPrune {
+      pruneEmptyTempDirectories(startingAt: directory)
     }
 
     if count > 0 {
@@ -348,6 +372,36 @@ final class TempCaptureManager {
     return appSupport
       .appendingPathComponent("Snapzy", isDirectory: true)
       .appendingPathComponent("Captures", isDirectory: true)
+  }
+
+  private func relativeTempPath(for url: URL) -> String? {
+    let tempPath = tempCaptureDirectory.standardizedFileURL.path
+    let filePath = url.standardizedFileURL.path
+
+    guard filePath.hasPrefix(tempPath + "/") else { return nil }
+
+    let relativePath = String(filePath.dropFirst(tempPath.count + 1))
+    return relativePath.isEmpty ? nil : relativePath
+  }
+
+  private func pruneEmptyTempDirectories(startingAt directory: URL) {
+    let rootPath = tempCaptureDirectory.standardizedFileURL.path
+    var current = directory.standardizedFileURL
+
+    while current.path.hasPrefix(rootPath + "/") {
+      guard
+        let contents = try? FileManager.default.contentsOfDirectory(
+          at: current,
+          includingPropertiesForKeys: nil
+        ),
+        contents.isEmpty
+      else {
+        break
+      }
+
+      try? FileManager.default.removeItem(at: current)
+      current.deleteLastPathComponent()
+    }
   }
 
   private func createRecordingProcessingDirectory() throws -> URL {
