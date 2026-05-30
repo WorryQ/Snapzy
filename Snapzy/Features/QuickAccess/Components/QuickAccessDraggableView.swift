@@ -2,86 +2,116 @@
 //  QuickAccessDraggableView.swift
 //  Snapzy
 //
-//  NSView wrapper for proper drag-to-external-app support
-//  Uses NSDraggingSession for reliable file drag operations
+//  AppKit bridge for Quick Access card swipe and drag-to-app behavior.
 //
 
 import AppKit
 import SwiftUI
 
-/// NSViewRepresentable that enables proper drag-to-external-app with NSDraggingSession
-struct QuickAccessDraggableView<Content: View>: NSViewRepresentable {
-  let content: Content
-  let fileURL: URL
-  let isVideo: Bool
-  let thumbnail: NSImage
-  let onDragStarted: () -> Void
-  let onDragEnded: (Bool) -> Void
+enum QuickAccessCardDragIntent: Equatable {
+  case undetermined
+  case swipeToDismiss
+  case dragToApp
+}
 
-  func makeNSView(context: Context) -> DraggableHostingView {
-    let view = DraggableHostingView(
-      rootView: AnyView(content),
-      fileURL: fileURL,
-      isVideo: isVideo,
-      thumbnail: thumbnail,
-      onDragStarted: onDragStarted,
-      onDragEnded: onDragEnded
-    )
-    return view
+struct QuickAccessCardDragPolicy {
+  static let directionThreshold: CGFloat = 30
+  static let dismissDistanceThreshold: CGFloat = 80
+  static let dismissVelocityThreshold: CGFloat = 300
+
+  let dismissDirection: CGFloat
+
+  func intent(forHorizontalTranslation translation: CGFloat) -> QuickAccessCardDragIntent {
+    guard abs(translation) > Self.directionThreshold else {
+      return .undetermined
+    }
+
+    return translation * dismissDirection > 0 ? .swipeToDismiss : .dragToApp
   }
 
-  func updateNSView(_ nsView: DraggableHostingView, context: Context) {
-    nsView.rootView = AnyView(content)
-    nsView.fileURL = fileURL
-    nsView.isVideo = isVideo
-    nsView.thumbnail = thumbnail
+  func shouldDismiss(
+    horizontalTranslation translation: CGFloat,
+    horizontalVelocity velocity: CGFloat
+  ) -> Bool {
+    abs(translation) > Self.dismissDistanceThreshold || abs(velocity) > Self.dismissVelocityThreshold
   }
 }
 
-/// Custom NSView that hosts SwiftUI content and handles drag operations
-final class DraggableHostingView: NSView, NSDraggingSource {
-  var rootView: AnyView {
-    didSet {
-      hostingView.rootView = rootView
-    }
+/// Transparent monitor view that lets SwiftUI keep normal hit testing while
+/// AppKit owns the native drag session.
+struct QuickAccessDraggableView: NSViewRepresentable {
+  let fileURL: URL
+  let thumbnail: NSImage
+  let dismissDirection: CGFloat
+  let dragDropEnabled: Bool
+  let onDragStarted: () -> Void
+  let onDragEnded: (Bool) -> Void
+  let onSwipeChanged: (CGFloat) -> Void
+  let onSwipeEnded: (CGFloat, CGFloat) -> Void
+
+  func makeNSView(context: Context) -> QuickAccessDragMonitorView {
+    QuickAccessDragMonitorView(
+      fileURL: fileURL,
+      thumbnail: thumbnail,
+      dismissDirection: dismissDirection,
+      dragDropEnabled: dragDropEnabled,
+      onDragStarted: onDragStarted,
+      onDragEnded: onDragEnded,
+      onSwipeChanged: onSwipeChanged,
+      onSwipeEnded: onSwipeEnded
+    )
   }
+
+  func updateNSView(_ nsView: QuickAccessDragMonitorView, context: Context) {
+    nsView.fileURL = fileURL
+    nsView.thumbnail = thumbnail
+    nsView.dismissDirection = dismissDirection
+    nsView.dragDropEnabled = dragDropEnabled
+    nsView.onDragStarted = onDragStarted
+    nsView.onDragEnded = onDragEnded
+    nsView.onSwipeChanged = onSwipeChanged
+    nsView.onSwipeEnded = onSwipeEnded
+  }
+}
+
+final class QuickAccessDragMonitorView: NSView, NSDraggingSource {
   var fileURL: URL
-  var isVideo: Bool
   var thumbnail: NSImage
+  var dismissDirection: CGFloat
+  var dragDropEnabled: Bool
   var onDragStarted: () -> Void
   var onDragEnded: (Bool) -> Void
+  var onSwipeChanged: (CGFloat) -> Void
+  var onSwipeEnded: (CGFloat, CGFloat) -> Void
 
-  private var hostingView: NSHostingView<AnyView>!
   private var isDragging = false
-  private var dragStartLocation: NSPoint?
+  private var eventMonitor: Any?
+  private var mouseDownLocation: NSPoint?
+  private var gestureIntent: QuickAccessCardDragIntent = .undetermined
+  private var lastDragSample: (timestamp: TimeInterval, translation: CGFloat)?
+  private var latestVelocity: CGFloat = 0
+  private var sourceAccess: SandboxFileAccessManager.ScopedAccess?
 
   init(
-    rootView: AnyView,
     fileURL: URL,
-    isVideo: Bool,
     thumbnail: NSImage,
+    dismissDirection: CGFloat,
+    dragDropEnabled: Bool,
     onDragStarted: @escaping () -> Void,
-    onDragEnded: @escaping (Bool) -> Void
+    onDragEnded: @escaping (Bool) -> Void,
+    onSwipeChanged: @escaping (CGFloat) -> Void,
+    onSwipeEnded: @escaping (CGFloat, CGFloat) -> Void
   ) {
-    self.rootView = rootView
     self.fileURL = fileURL
-    self.isVideo = isVideo
     self.thumbnail = thumbnail
+    self.dismissDirection = dismissDirection
+    self.dragDropEnabled = dragDropEnabled
     self.onDragStarted = onDragStarted
     self.onDragEnded = onDragEnded
+    self.onSwipeChanged = onSwipeChanged
+    self.onSwipeEnded = onSwipeEnded
 
     super.init(frame: .zero)
-
-    hostingView = NSHostingView(rootView: rootView)
-    hostingView.translatesAutoresizingMaskIntoConstraints = false
-    addSubview(hostingView)
-
-    NSLayoutConstraint.activate([
-      hostingView.topAnchor.constraint(equalTo: topAnchor),
-      hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
-      hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
-      hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ])
   }
 
   @available(*, unavailable)
@@ -89,17 +119,139 @@ final class DraggableHostingView: NSView, NSDraggingSource {
     fatalError("init(coder:) has not been implemented")
   }
 
-  // MARK: - Drag Initiation (called from SwiftUI)
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    updateEventMonitor()
+  }
 
-  func startDrag(at location: NSPoint) {
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  deinit {
+    removeEventMonitor()
+    sourceAccess?.stop()
+  }
+
+  // MARK: - Event Monitoring
+
+  private func updateEventMonitor() {
+    removeEventMonitor()
+    guard window != nil else { return }
+
+    eventMonitor = NSEvent.addLocalMonitorForEvents(
+      matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+    ) { [weak self] event in
+      self?.handle(event) ?? event
+    }
+  }
+
+  private func removeEventMonitor() {
+    if let eventMonitor {
+      NSEvent.removeMonitor(eventMonitor)
+      self.eventMonitor = nil
+    }
+  }
+
+  private func handle(_ event: NSEvent) -> NSEvent {
+    guard event.window === window else { return event }
+
+    switch event.type {
+    case .leftMouseDown:
+      beginTrackingIfNeeded(event)
+    case .leftMouseDragged:
+      continueTracking(event)
+    case .leftMouseUp:
+      endTracking(event)
+    default:
+      break
+    }
+
+    return event
+  }
+
+  private func beginTrackingIfNeeded(_ event: NSEvent) {
+    guard !event.modifierFlags.contains(.control) else {
+      resetTracking()
+      return
+    }
+
+    let location = convert(event.locationInWindow, from: nil)
+    guard bounds.contains(location) else { return }
+
+    mouseDownLocation = location
+    gestureIntent = .undetermined
+    latestVelocity = 0
+    lastDragSample = (event.timestamp, 0)
+  }
+
+  private func continueTracking(_ event: NSEvent) {
+    guard let mouseDownLocation, !isDragging else { return }
+
+    let location = convert(event.locationInWindow, from: nil)
+    let translation = location.x - mouseDownLocation.x
+    updateVelocity(translation: translation, timestamp: event.timestamp)
+
+    let policy = QuickAccessCardDragPolicy(dismissDirection: dismissDirection)
+    if gestureIntent == .undetermined {
+      gestureIntent = policy.intent(forHorizontalTranslation: translation)
+
+      if gestureIntent == .dragToApp {
+        guard dragDropEnabled else { return }
+        beginFileDrag(with: event)
+        return
+      }
+    }
+
+    if gestureIntent == .swipeToDismiss {
+      onSwipeChanged(translation)
+    }
+  }
+
+  private func endTracking(_ event: NSEvent) {
+    guard let mouseDownLocation else {
+      resetTracking()
+      return
+    }
+
+    if gestureIntent == .swipeToDismiss {
+      let location = convert(event.locationInWindow, from: nil)
+      let translation = location.x - mouseDownLocation.x
+      onSwipeEnded(translation, latestVelocity)
+    }
+
+    resetTracking()
+  }
+
+  private func resetTracking() {
+    mouseDownLocation = nil
+    gestureIntent = .undetermined
+    lastDragSample = nil
+    latestVelocity = 0
+  }
+
+  private func updateVelocity(translation: CGFloat, timestamp: TimeInterval) {
+    defer {
+      lastDragSample = (timestamp, translation)
+    }
+
+    guard let lastDragSample else { return }
+    let elapsed = timestamp - lastDragSample.timestamp
+    guard elapsed > 0 else { return }
+
+    latestVelocity = (translation - lastDragSample.translation) / CGFloat(elapsed)
+  }
+
+  // MARK: - Drag Initiation
+
+  private func beginFileDrag(with event: NSEvent) {
     guard !isDragging else { return }
+
     isDragging = true
+    sourceAccess = SandboxFileAccessManager.shared.beginAccessingURL(fileURL)
     onDragStarted()
 
-    // Create drag item
     let dragItem = NSDraggingItem(pasteboardWriter: fileURL as NSURL)
-
-    // Create drag image from thumbnail
     let imageSize = NSSize(width: 120, height: 75)
     let dragImage = NSImage(size: imageSize)
     dragImage.lockFocus()
@@ -111,14 +263,25 @@ final class DraggableHostingView: NSView, NSDraggingSource {
     )
     dragImage.unlockFocus()
 
+    let mouseLocation = convert(event.locationInWindow, from: nil)
     dragItem.setDraggingFrame(
-      NSRect(origin: NSPoint(x: -60, y: -37), size: imageSize),
+      NSRect(
+        x: mouseLocation.x - imageSize.width / 2,
+        y: mouseLocation.y - imageSize.height / 2,
+        width: imageSize.width,
+        height: imageSize.height
+      ),
       contents: dragImage
     )
 
-    // Start drag session
-    let session = beginDraggingSession(with: [dragItem], event: NSApp.currentEvent!, source: self)
+    let session = beginDraggingSession(with: [dragItem], event: event, source: self)
     session.animatesToStartingPositionsOnCancelOrFail = true
+    DiagnosticLogger.shared.log(
+      .info,
+      .action,
+      "Quick access drag started",
+      context: ["fileName": fileURL.lastPathComponent]
+    )
   }
 
   // MARK: - NSDraggingSource
@@ -127,7 +290,7 @@ final class DraggableHostingView: NSView, NSDraggingSource {
     _ session: NSDraggingSession,
     sourceOperationMaskFor context: NSDraggingContext
   ) -> NSDragOperation {
-    return context == .outsideApplication ? .copy : .copy
+    .copy
   }
 
   func draggingSession(
@@ -137,6 +300,18 @@ final class DraggableHostingView: NSView, NSDraggingSource {
   ) {
     isDragging = false
     let success = operation != []
+    sourceAccess?.stop()
+    sourceAccess = nil
+    resetTracking()
+    DiagnosticLogger.shared.log(
+      .info,
+      .action,
+      "Quick access drag ended",
+      context: [
+        "operation": "\(operation.rawValue)",
+        "success": success ? "true" : "false",
+      ]
+    )
     onDragEnded(success)
   }
 }

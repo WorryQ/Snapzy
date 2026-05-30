@@ -9,13 +9,6 @@
 import AppKit
 import SwiftUI
 
-/// Gesture mode for direction-based handling
-private enum GestureMode {
-  case undetermined
-  case swipeToDismiss
-  case dragToApp
-}
-
 /// Displays a single item preview with hover-activated actions and swipe gestures
 struct QuickAccessCardView: View {
   let item: QuickAccessItem
@@ -28,16 +21,12 @@ struct QuickAccessCardView: View {
   @State private var isHovering = false
   @State private var isDragging = false
   @State private var isDismissing = false
-  @State private var dragRemovalTask: Task<Void, Never>?
-  @State private var gestureMode: GestureMode = .undetermined
   @State private var swipeOffset: CGFloat = 0
   @State private var isCloudUploading = false
   @State private var cloudUploadProgress: Double = 0
   @Environment(\.accessibilityReduceMotion) var reduceMotion
 
   private let cornerRadius: CGFloat = 16
-  /// Minimum movement to determine direction (30px threshold for drag activation)
-  private let directionThreshold: CGFloat = 30
 
   /// Scaled card dimensions based on overlay scale setting
   private var scaledWidth: CGFloat { QuickAccessLayout.scaledCardWidth(CGFloat(manager.overlayScale)) }
@@ -125,10 +114,9 @@ struct QuickAccessCardView: View {
       QuickAccessContextMenuPresenter(entries: quickAccessContextMenuEntries)
         .frame(width: scaledWidth, height: scaledHeight)
     )
-    // Use high-priority gesture for direction detection
-    .gesture(directionAwareGesture)
+    .overlay(dragInteractionBridge.frame(width: scaledWidth, height: scaledHeight))
     .onDisappear {
-      dragRemovalTask?.cancel()
+      isDragging = false
     }
     .animation(QuickAccessAnimations.hoverOverlay, value: isHovering)
   }
@@ -212,146 +200,46 @@ struct QuickAccessCardView: View {
 
   // MARK: - Gestures
 
-  /// Check if translation is toward dismiss direction (toward screen edge)
-  private func isDismissDirection(_ translation: CGFloat) -> Bool {
-    // Right panel: positive translation (swipe right) dismisses
-    // Left panel: negative translation (swipe left) dismisses
-    return (translation * dismissDirection) > 0
+  private var dragInteractionBridge: some View {
+    QuickAccessDraggableView(
+      fileURL: item.url,
+      thumbnail: item.thumbnail,
+      dismissDirection: dismissDirection,
+      dragDropEnabled: manager.dragDropEnabled,
+      onDragStarted: {
+        isDragging = true
+      },
+      onDragEnded: { success in
+        isDragging = false
+        if success {
+          // Only remove card from UI — don't delete the file.
+          // Temp files stay available for the receiving app.
+          manager.dismissCard(id: item.id)
+        }
+      },
+      onSwipeChanged: { translation in
+        guard !reduceMotion else { return }
+        swipeOffset = translation
+      },
+      onSwipeEnded: { translation, velocity in
+        handleSwipeEnded(translation: translation, velocity: velocity)
+      }
+    )
   }
 
-  /// Direction-aware gesture that decides between swipe-dismiss and drag-to-app
-  private var directionAwareGesture: some Gesture {
-    DragGesture(minimumDistance: 5)
-      .onChanged { value in
-        guard !reduceMotion else { return }
+  private func handleSwipeEnded(translation: CGFloat, velocity: CGFloat) {
+    let policy = QuickAccessCardDragPolicy(dismissDirection: dismissDirection)
 
-        let translation = value.translation.width
-
-        // Determine mode once after passing threshold
-        if gestureMode == .undetermined && abs(translation) > directionThreshold {
-          if isDismissDirection(translation) {
-            gestureMode = .swipeToDismiss
-          } else {
-            gestureMode = .dragToApp
-            // Trigger drag-to-app
-            if manager.dragDropEnabled {
-              startDragToApp()
-            }
-          }
-        }
-
-        // Only update swipe offset if in swipe mode
-        if gestureMode == .swipeToDismiss {
-          swipeOffset = translation
-        }
-      }
-      .onEnded { value in
-        defer {
-          // Reset state
-          gestureMode = .undetermined
-          swipeOffset = 0
-        }
-
-        guard !reduceMotion else { return }
-
-        let translation = value.translation.width
-        let velocity = value.velocity.width
-        let threshold: CGFloat = 80
-        let velocityThreshold: CGFloat = 300
-
-        // Handle swipe-to-dismiss
-        if gestureMode == .swipeToDismiss {
-          if abs(translation) > threshold || abs(velocity) > velocityThreshold {
-            isDismissing = true
-            QuickAccessSound.dismiss.play(reduceMotion: reduceMotion)
-            manager.removeScreenshot(id: item.id)
-          } else {
-            // Snap back
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-              swipeOffset = 0
-            }
-          }
-        }
-        // dragToApp mode is handled separately
-      }
-  }
-
-  /// Start drag-to-app session using NSDraggingSession
-  private func startDragToApp() {
-    guard !isDragging else { return }
-    isDragging = true
-
-    // Find the window and start a proper drag session
-    guard let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }),
-          let contentView = window.contentView,
-          let currentEvent = NSApp.currentEvent else {
-      isDragging = false
+    if policy.shouldDismiss(horizontalTranslation: translation, horizontalVelocity: velocity) {
+      swipeOffset = 0
+      isDismissing = true
+      QuickAccessSound.dismiss.play(reduceMotion: reduceMotion)
+      manager.removeScreenshot(id: item.id)
       return
     }
 
-    let sourceAccess = SandboxFileAccessManager.shared.beginAccessingURL(item.url)
-
-    let dragSource = DragSource(
-      dragID: UUID(),
-      sourceAccess: sourceAccess,
-      onEnded: { [weak manager, itemId = item.id] success in
-        Task { @MainActor in
-          if success {
-            // Only remove card from UI — don't delete the file.
-            // Temp files stay on disk for the receiving app to read
-            // and get cleaned up on next launch via cleanupOrphanedFiles().
-            manager?.dismissCard(id: itemId)
-          }
-        }
-      }
-    )
-    QuickAccessDragRegistry.retain(dragSource, for: dragSource.dragID)
-    // Use concrete file URL payload so browser chat drop zones receive a real file.
-    let fileURLDragItem = NSDraggingItem(pasteboardWriter: item.url as NSURL)
-
-    // Create drag image from thumbnail
-    let imageSize = NSSize(width: 100, height: 62)
-    let dragImage = NSImage(size: imageSize)
-    dragImage.lockFocus()
-    item.thumbnail.draw(
-      in: NSRect(origin: .zero, size: imageSize),
-      from: .zero,
-      operation: .sourceOver,
-      fraction: 0.8
-    )
-    dragImage.unlockFocus()
-
-    // Set drag frame centered on mouse
-    let mouseLocation = currentEvent.locationInWindow
-    fileURLDragItem.setDraggingFrame(
-      NSRect(
-        x: mouseLocation.x - imageSize.width / 2,
-        y: mouseLocation.y - imageSize.height / 2,
-        width: imageSize.width,
-        height: imageSize.height
-      ),
-      contents: dragImage
-    )
-    // Start the drag session
-    let dragSession = contentView.beginDraggingSession(
-      with: [fileURLDragItem],
-      event: currentEvent,
-      source: dragSource
-    )
-    DiagnosticLogger.shared.log(
-      .info,
-      .action,
-      "Quick access drag started",
-      context: ["fileName": item.url.lastPathComponent]
-    )
-    dragSession.animatesToStartingPositionsOnCancelOrFail = true
-
-    // Reset dragging state after a delay
-    dragRemovalTask?.cancel()
-    dragRemovalTask = Task { @MainActor in
-      try? await Task.sleep(nanoseconds: 500_000_000)
-      guard !Task.isCancelled else { return }
-      isDragging = false
+    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+      swipeOffset = 0
     }
   }
 
@@ -962,75 +850,6 @@ private final class QuickAccessContextMenuAction: NSObject {
 
   func perform() {
     action()
-  }
-}
-
-// MARK: - NSDraggingSource for Drag-to-App
-
-/// Drag source handler for NSDraggingSession.
-private final class DragSource: NSObject, NSDraggingSource {
-  let dragID: UUID
-  private var sourceAccess: SandboxFileAccessManager.ScopedAccess?
-  private let onEnded: (Bool) -> Void
-
-  init(
-    dragID: UUID,
-    sourceAccess: SandboxFileAccessManager.ScopedAccess,
-    onEnded: @escaping (Bool) -> Void
-  ) {
-    self.dragID = dragID
-    self.sourceAccess = sourceAccess
-    self.onEnded = onEnded
-    super.init()
-  }
-
-  func draggingSession(
-    _ session: NSDraggingSession,
-    sourceOperationMaskFor context: NSDraggingContext
-  ) -> NSDragOperation {
-    return context == .outsideApplication ? .copy : .copy
-  }
-
-  func draggingSession(
-    _ session: NSDraggingSession,
-    endedAt screenPoint: NSPoint,
-    operation: NSDragOperation
-  ) {
-    sourceAccess?.stop()
-    sourceAccess = nil
-    QuickAccessDragRegistry.release(for: dragID)
-    DiagnosticLogger.shared.log(
-      .info,
-      .action,
-      "Quick access drag ended",
-      context: [
-        "operation": "\(operation.rawValue)",
-        "success": operation != [] ? "true" : "false",
-      ]
-    )
-    onEnded(operation != [])
-  }
-
-  deinit {
-    sourceAccess?.stop()
-    sourceAccess = nil
-  }
-}
-
-private enum QuickAccessDragRegistry {
-  private static let lock = NSLock()
-  private static var activeSources: [UUID: DragSource] = [:]
-
-  static func retain(_ source: DragSource, for id: UUID) {
-    lock.lock()
-    activeSources[id] = source
-    lock.unlock()
-  }
-
-  static func release(for id: UUID) {
-    lock.lock()
-    activeSources[id] = nil
-    lock.unlock()
   }
 }
 

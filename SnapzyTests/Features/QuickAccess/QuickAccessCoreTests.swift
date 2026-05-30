@@ -51,6 +51,29 @@ final class QuickAccessCoreTests: XCTestCase {
     XCTAssertFalse(QuickAccessProcessingState.failed.isProcessing)
   }
 
+  func testQuickAccessCardDragPolicy_classifiesRightPanelDirections() {
+    let policy = QuickAccessCardDragPolicy(dismissDirection: 1)
+
+    XCTAssertEqual(policy.intent(forHorizontalTranslation: 30), .undetermined)
+    XCTAssertEqual(policy.intent(forHorizontalTranslation: 31), .swipeToDismiss)
+    XCTAssertEqual(policy.intent(forHorizontalTranslation: -31), .dragToApp)
+  }
+
+  func testQuickAccessCardDragPolicy_classifiesLeftPanelDirections() {
+    let policy = QuickAccessCardDragPolicy(dismissDirection: -1)
+
+    XCTAssertEqual(policy.intent(forHorizontalTranslation: -31), .swipeToDismiss)
+    XCTAssertEqual(policy.intent(forHorizontalTranslation: 31), .dragToApp)
+  }
+
+  func testQuickAccessCardDragPolicy_dismissesByDistanceOrVelocity() {
+    let policy = QuickAccessCardDragPolicy(dismissDirection: 1)
+
+    XCTAssertFalse(policy.shouldDismiss(horizontalTranslation: 80, horizontalVelocity: 300))
+    XCTAssertTrue(policy.shouldDismiss(horizontalTranslation: 81, horizontalVelocity: 0))
+    XCTAssertTrue(policy.shouldDismiss(horizontalTranslation: 10, horizontalVelocity: 301))
+  }
+
   func testQuickAccessItemEquality_tracksMutablePresentationState() {
     let id = UUID()
     let thumbnail = NSImage(size: CGSize(width: 16, height: 16))

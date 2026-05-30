@@ -15,6 +15,7 @@ final class QuickAccessPanel: NSPanel {
   private var overlayScale: CGFloat = 1
   private var localMouseMonitor: Any?
   private var globalMouseMonitor: Any?
+  private var isMouseInteractionActive = false
 
   init(contentRect: NSRect) {
     super.init(
@@ -80,6 +81,8 @@ final class QuickAccessPanel: NSPanel {
 
   private func installMouseMonitors() {
     let mask: NSEvent.EventTypeMask = [
+      .leftMouseDown,
+      .leftMouseUp,
       .mouseMoved,
       .leftMouseDragged,
       .rightMouseDragged,
@@ -88,14 +91,14 @@ final class QuickAccessPanel: NSPanel {
 
     localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
       MainActor.assumeIsolated {
-        self?.refreshMousePassthrough()
+        self?.handleLocalMouseEvent(event)
       }
       return event
     }
 
-    globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+    globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
       Task { @MainActor in
-        self?.refreshMousePassthrough()
+        self?.handleGlobalMouseEvent(event)
       }
     }
   }
@@ -112,7 +115,39 @@ final class QuickAccessPanel: NSPanel {
   }
 
   private func refreshMousePassthrough() {
+    if isMouseInteractionActive && NSEvent.pressedMouseButtons & 1 == 0 {
+      isMouseInteractionActive = false
+    }
+
+    if isMouseInteractionActive {
+      ignoresMouseEvents = false
+      return
+    }
+
     ignoresMouseEvents = !containsInteractivePoint(NSEvent.mouseLocation)
+  }
+
+  private func handleLocalMouseEvent(_ event: NSEvent) {
+    if event.window === self {
+      switch event.type {
+      case .leftMouseDown:
+        isMouseInteractionActive = containsInteractivePoint(NSEvent.mouseLocation)
+      case .leftMouseUp:
+        isMouseInteractionActive = false
+      default:
+        break
+      }
+    }
+
+    refreshMousePassthrough()
+  }
+
+  private func handleGlobalMouseEvent(_ event: NSEvent) {
+    if event.type == .leftMouseUp {
+      isMouseInteractionActive = false
+    }
+
+    refreshMousePassthrough()
   }
 
   override var canBecomeKey: Bool { false }
