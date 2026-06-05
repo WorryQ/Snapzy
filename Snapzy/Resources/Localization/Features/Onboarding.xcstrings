@@ -4821,7 +4821,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Consejo único"
+            "value" : "Donativo único"
           }
         },
         "fr" : {
@@ -4833,7 +4833,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1 回限りのヒント"
+            "value" : "1回限りの支援"
           }
         },
         "ko" : {
@@ -4845,7 +4845,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Разовый совет"
+            "value" : "Единоразовая поддержка"
           }
         },
         "vi" : {
@@ -4857,13 +4857,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一次性小费"
+            "value" : "一次性打赏"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一次性小費"
+            "value" : "一次性打賞"
           }
         }
       }
