@@ -195,6 +195,30 @@ final class PostCaptureActionHandlerTests: XCTestCase {
     XCTAssertEqual(fakeQuickAccess.addedScreenshots, [tempFileURL])
   }
 
+  func testHandleScreenshotCapture_copiesToClipboardBeforeQuickAccess() async throws {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString("stale clipboard value", forType: .string)
+
+    let expectedURL = try XCTUnwrap(tempFileURL)
+    let fakeQuickAccess = FakeQuickAccessManager()
+    fakeQuickAccess.onAddScreenshot = { url in
+      XCTAssertEqual(url, expectedURL)
+      let item = NSPasteboard.general.pasteboardItems?.first
+      XCTAssertTrue(item?.types.contains(.fileURL) ?? false)
+      XCTAssertTrue(item?.types.contains(.png) ?? false)
+      XCTAssertEqual(
+        (NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: nil) as? [URL])?.first?.standardizedFileURL,
+        expectedURL.standardizedFileURL
+      )
+    }
+    let handler = makeHandler(quickAccess: fakeQuickAccess)
+
+    await handler.handleScreenshotCapture(url: tempFileURL)
+
+    XCTAssertEqual(fakeQuickAccess.addedScreenshots, [tempFileURL])
+  }
+
   func testScreenshotPresetAutoApplier_noDefaultPreset_preservesOriginalFile() throws {
     let beforeData = try Data(contentsOf: tempFileURL)
 

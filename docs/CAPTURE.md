@@ -174,7 +174,7 @@ Crop and Mockup are **not** available in the inline overlay (full editor only).
 - Moving or resizing the selected region refreshes the underlying cropped image while **preserving existing annotations** via `replaceSourceImagePreservingAnnotations(_:annotationOffset:)`.
 - Cropped source images derive their display scale from the captured bitmap, return their pixel-aligned screen rect, and Capture Markup updates the visible selection to that rect so Retina and external-display previews stay 1:1 with the backing bitmap instead of being resampled. Low-density external-display crops are promoted after crop to the minimum Retina output scale with native vImage resampling plus bounded edge enhancement, preserving fast native snapshot acquisition while avoiding 1x images being stretched in Annotate. Mixed-display composite crops apply that promotion per low-density slice rather than only when the whole capture is low-density.
 - Single-display selections still use the per-display crop path; cross-display selections use the same composite crop path as frozen area capture.
-- Finishing routes through the normal screenshot post-capture pipeline, so Quick Access, clipboard copy, auto-open, and history all behave identically to a standard area screenshot.
+- Finishing routes through the normal screenshot post-capture pipeline, so clipboard copy, Quick Access, auto-open, and history all behave identically to a standard area screenshot. Clipboard copy runs before Quick Access work so pasteboard updates stay immediate even if thumbnail generation or overlay presentation is slow.
 - Keyboard handling uses both local and global `NSEvent` monitors to catch `Space`, `Enter`, `Esc`, `Cmd+S`, and `Cmd+C` reliably. `Cmd+C` only copies the rendered inline capture when the overlay owns the event (local event or key overlay window), and active text editing keeps native text copy behavior.
 
 ## Scrolling Capture
@@ -440,7 +440,7 @@ flowchart TD
 | `scripts/run-qr-detection-performance-probe.sh` | Local Vision QR timing probe for OCR latency checks |
 | `Snapzy/Services/Capture/ScreenCaptureManager.swift` | Core screenshot engine, frozen snapshot capture, and file writing |
 | `Snapzy/Services/Capture/FrozenAreaCaptureSession.swift` | Frozen display snapshots used by area screenshot selection |
-| `Snapzy/Services/Capture/PostCaptureActionHandler.swift` | Quick Access, clipboard, and screenshot auto-open routing |
+| `Snapzy/Services/Capture/PostCaptureActionHandler.swift` | Clipboard-first Quick Access and screenshot auto-open routing |
 | `Snapzy/Services/Capture/ScreenshotPresetAutoApplier.swift` | Lightweight default canvas preset render and editable session creation during post-capture routing |
 | `Snapzy/Services/Capture/TempCaptureManager.swift` | Save-vs-temp destination logic and temp capture lifecycle |
 | `Snapzy/Services/Capture/ScrollingCapture/ScrollingCaptureCoordinator.swift` | Long screenshot session orchestration |

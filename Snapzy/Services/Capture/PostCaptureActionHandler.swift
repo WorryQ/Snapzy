@@ -92,15 +92,6 @@ final class PostCaptureActionHandler {
       }
     }
 
-    if preferences.isActionEnabled(.showQuickAccess, for: .screenshot) {
-      for url in validURLs {
-        let item = await quickAccess.addScreenshot(url: url)
-        if let item, let sessionData = sessionDataByURL[url] {
-          AnnotateManager.shared.saveSessionData(sessionData, for: item.id)
-        }
-      }
-    }
-
     if preferences.isActionEnabled(.copyFile, for: .screenshot) {
       ClipboardHelper.copyFileURLs(validURLs)
       DiagnosticLogger.shared.log(
@@ -109,6 +100,15 @@ final class PostCaptureActionHandler {
         "Screenshot batch file URLs copied to clipboard",
         context: ["count": "\(validURLs.count)"]
       )
+    }
+
+    if preferences.isActionEnabled(.showQuickAccess, for: .screenshot) {
+      for url in validURLs {
+        let item = await quickAccess.addScreenshot(url: url)
+        if let item, let sessionData = sessionDataByURL[url] {
+          AnnotateManager.shared.saveSessionData(sessionData, for: item.id)
+        }
+      }
     }
 
     if preferences.isActionEnabled(.openAnnotate, for: .screenshot), let firstURL = validURLs.first {
@@ -323,6 +323,21 @@ final class PostCaptureActionHandler {
       ]
     )
 
+    // Copy file to clipboard before slower UI actions. Auto-copy is expected
+    // to update immediately after capture; it must not depend on thumbnail
+    // generation, Quick Access animations, or editor opening.
+    if preferences.isActionEnabled(.copyFile, for: captureType) {
+      copyToClipboard(url: url, isVideo: captureType == .recording)
+      let label = captureType == .screenshot ? "screenshot" : "recording"
+      logger.debug("Clipboard copy executed for \(url.lastPathComponent)")
+      DiagnosticLogger.shared.log(
+        .info,
+        .clipboard,
+        "Post-capture clipboard action executed",
+        context: ["captureType": label, "fileName": url.lastPathComponent]
+      )
+    }
+
     // Show Quick Access Overlay
     var quickAccessItem: QuickAccessItem?
     if !skipQuickAccess && preferences.isActionEnabled(.showQuickAccess, for: captureType) {
@@ -366,19 +381,6 @@ final class PostCaptureActionHandler {
         .action,
         "Post-capture pin action executed",
         context: ["fileName": url.lastPathComponent]
-      )
-    }
-
-    // Copy file to clipboard
-    if preferences.isActionEnabled(.copyFile, for: captureType) {
-      copyToClipboard(url: url, isVideo: captureType == .recording)
-      let label = captureType == .screenshot ? "screenshot" : "recording"
-      logger.debug("Clipboard copy executed for \(url.lastPathComponent)")
-      DiagnosticLogger.shared.log(
-        .info,
-        .clipboard,
-        "Post-capture clipboard action executed",
-        context: ["captureType": label, "fileName": url.lastPathComponent]
       )
     }
 

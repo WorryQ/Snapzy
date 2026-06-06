@@ -17,9 +17,12 @@ final class FakeQuickAccessManager: QuickAccessManaging {
   private(set) var createdVideoItems: [QuickAccessItem] = []
   private(set) var pinnedScreenshotIDs: [UUID] = []
   private(set) var pinnedScreenshotURLs: [URL] = []
+  var onAddScreenshot: ((URL) -> Void)?
+  var onAddVideo: ((URL) -> Void)?
 
   @discardableResult
   func addScreenshot(url: URL) async -> QuickAccessItem? {
+    onAddScreenshot?(url)
     addedScreenshots.append(url)
     let item = QuickAccessItem(url: url, thumbnail: NSImage(size: NSSize(width: 1, height: 1)))
     createdScreenshotItems.append(item)
@@ -28,6 +31,7 @@ final class FakeQuickAccessManager: QuickAccessManaging {
 
   @discardableResult
   func addVideo(url: URL) async -> QuickAccessItem? {
+    onAddVideo?(url)
     addedVideos.append(url)
     let item = QuickAccessItem(
       url: url,
