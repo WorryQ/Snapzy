@@ -33,10 +33,7 @@ private enum QuickPropertiesDensity {
   }
 
   var contextChipWidth: CGFloat {
-    switch self {
-    case .regular: return 172
-    case .compact: return 30
-    }
+    30
   }
 
   var selectionInfoWidth: CGFloat {
@@ -148,9 +145,6 @@ private enum QuickPropertiesDensity {
     }
   }
 
-  var showsFullContext: Bool {
-    self == .regular
-  }
 }
 
 struct AnnotateQuickPropertiesBar: View {
@@ -498,19 +492,11 @@ struct AnnotateQuickPropertiesBar: View {
     let icon = state.quickPropertiesTool?.icon ?? "slider.horizontal.3"
     let title = state.quickPropertiesContextTitle
 
-    if density.showsFullContext {
-      quickPropertiesChip(
-        icon: icon,
-        title: title,
-        isSelectedItem: state.quickPropertiesMode == .selectedItem
-      )
-    } else {
-      compactContextChip(
-        icon: icon,
-        title: title,
-        isSelectedItem: state.quickPropertiesMode == .selectedItem
-      )
-    }
+    compactContextChip(
+      icon: icon,
+      title: title,
+      isSelectedItem: state.quickPropertiesMode == .selectedItem
+    )
   }
 
   @ViewBuilder
@@ -519,44 +505,11 @@ struct AnnotateQuickPropertiesBar: View {
     let icon = isSelectionTool ? state.selectedTool.icon : "slider.horizontal.3"
     let title = isSelectionTool ? L10n.Annotate.selectionTool : L10n.AnnotateContext.defaults(L10n.AnnotateUI.annotation)
 
-    if density.showsFullContext {
-      quickPropertiesChip(
-        icon: icon,
-        title: title,
-        isSelectedItem: false
-      )
-    } else {
-      compactContextChip(
-        icon: icon,
-        title: title,
-        isSelectedItem: false
-      )
-    }
-  }
-
-  private func quickPropertiesChip(icon: String, title: String, isSelectedItem: Bool) -> some View {
-    HStack(spacing: 6) {
-      Image(systemName: icon)
-        .font(.system(size: 11, weight: .semibold))
-      Text(title)
-        .font(Typography.labelMedium)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .layoutPriority(1)
-    }
-    .foregroundColor(.primary)
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Capsule()
-        .fill(Color.accentColor.opacity(isSelectedItem ? 0.18 : 0.1))
+    compactContextChip(
+      icon: icon,
+      title: title,
+      isSelectedItem: false
     )
-    .overlay(
-      Capsule()
-        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
-    )
-    .help(title)
   }
 
   private func compactContextChip(icon: String, title: String, isSelectedItem: Bool) -> some View {
