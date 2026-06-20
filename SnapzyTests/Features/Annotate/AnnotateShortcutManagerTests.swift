@@ -31,6 +31,11 @@ final class AnnotateShortcutManagerTests: XCTestCase {
     XCTAssertEqual(manager.tool(for: "r"), .rectangle)
   }
 
+  func testToolForKey_findsMappedNumericKey() {
+    manager.setShortcut("1", for: .rectangle)
+    XCTAssertEqual(manager.tool(for: "1"), .rectangle)
+  }
+
   func testToolForKey_returnsNilForUnmappedKey() {
     XCTAssertNil(manager.tool(for: "z"))
   }
@@ -66,6 +71,12 @@ final class AnnotateShortcutManagerTests: XCTestCase {
     manager.setShortcut("x", for: .rectangle)
     manager.setShortcut("x", for: .oval)
     XCTAssertEqual(manager.conflictingTool(for: "x", excluding: .oval), .rectangle)
+  }
+
+  func testConflictingTool_findsNumericConflict() {
+    manager.setShortcut("2", for: .rectangle)
+    manager.setShortcut("2", for: .oval)
+    XCTAssertEqual(manager.conflictingTool(for: "2", excluding: .oval), .rectangle)
   }
 
   func testConflictingTool_excludesSelf() {

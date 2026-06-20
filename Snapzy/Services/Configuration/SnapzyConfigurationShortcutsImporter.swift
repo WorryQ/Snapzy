@@ -144,8 +144,23 @@ extension SnapzyConfigurationImporter {
 
     for tool in AnnotateShortcutManager.configurableTools {
       if let key = reader.string("shortcuts", "annotate_tools", tool.rawValue) {
+        if key.isEmpty {
+          mutations.append {
+            AnnotateShortcutManager.shared.setShortcut(nil, for: tool)
+          }
+          continue
+        }
+
+        let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalizedKey.count == 1,
+              let shortcut = normalizedKey.first,
+              shortcut.isLetter || shortcut.isNumber || shortcut.isPunctuation || shortcut.isSymbol else {
+          reader.error("shortcuts.annotate_tools.\(tool.rawValue) must be a single letter, number, or special character")
+          continue
+        }
+
         mutations.append {
-          AnnotateShortcutManager.shared.setShortcut(key.first, for: tool)
+          AnnotateShortcutManager.shared.setShortcut(shortcut, for: tool)
         }
       }
       if let disabled {

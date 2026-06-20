@@ -142,6 +142,105 @@ final class SnapzyConfigurationImporterTests: XCTestCase {
     XCTAssertFalse(manager.isActionShortcutEnabled(for: .copyAndClose))
   }
 
+  func testImportAnnotateToolAcceptsNumericShortcut() {
+    let defaults = UserDefaultsFactory.make()
+    let manager = AnnotateShortcutManager.shared
+    manager.resetToDefaults()
+    defer { manager.resetToDefaults() }
+
+    let source = """
+    schema_version = 1
+
+    [shortcuts.annotate_tools]
+    rectangle = "1"
+    """
+
+    let result = SnapzyConfigurationImporter.importTOML(source, defaults: defaults)
+
+    XCTAssertFalse(result.hasErrors)
+    XCTAssertEqual(manager.shortcut(for: .rectangle), "1")
+  }
+
+  func testImportAnnotateToolNormalizesUppercaseShortcut() {
+    let defaults = UserDefaultsFactory.make()
+    let manager = AnnotateShortcutManager.shared
+    manager.resetToDefaults()
+    defer { manager.resetToDefaults() }
+
+    let source = """
+    schema_version = 1
+
+    [shortcuts.annotate_tools]
+    rectangle = "R"
+    """
+
+    let result = SnapzyConfigurationImporter.importTOML(source, defaults: defaults)
+
+    XCTAssertFalse(result.hasErrors)
+    XCTAssertEqual(manager.shortcut(for: .rectangle), "r")
+    XCTAssertEqual(manager.tool(for: "r"), .rectangle)
+  }
+
+  func testImportAnnotateToolAcceptsSpecialCharacterShortcut() {
+    let defaults = UserDefaultsFactory.make()
+    let manager = AnnotateShortcutManager.shared
+    manager.resetToDefaults()
+    defer { manager.resetToDefaults() }
+
+    let source = """
+    schema_version = 1
+
+    [shortcuts.annotate_tools]
+    rectangle = "="
+    """
+
+    let result = SnapzyConfigurationImporter.importTOML(source, defaults: defaults)
+
+    XCTAssertFalse(result.hasErrors)
+    XCTAssertEqual(manager.shortcut(for: .rectangle), "=")
+  }
+
+  func testImportAnnotateToolAllowsEmptyShortcut() {
+    let defaults = UserDefaultsFactory.make()
+    let manager = AnnotateShortcutManager.shared
+    manager.resetToDefaults()
+    manager.setShortcut("9", for: .rectangle)
+    defer { manager.resetToDefaults() }
+
+    let source = """
+    schema_version = 1
+
+    [shortcuts.annotate_tools]
+    rectangle = ""
+    """
+
+    let result = SnapzyConfigurationImporter.importTOML(source, defaults: defaults)
+
+    XCTAssertFalse(result.hasErrors)
+    XCTAssertNil(manager.shortcut(for: .rectangle))
+  }
+
+  func testImportAnnotateToolRejectsMultiCharacterShortcut() {
+    let defaults = UserDefaultsFactory.make()
+    let manager = AnnotateShortcutManager.shared
+    manager.resetToDefaults()
+    manager.setShortcut("9", for: .rectangle)
+    defer { manager.resetToDefaults() }
+
+    let source = """
+    schema_version = 1
+
+    [shortcuts.annotate_tools]
+    rectangle = "12"
+    """
+
+    let result = SnapzyConfigurationImporter.importTOML(source, defaults: defaults)
+
+    XCTAssertTrue(result.hasErrors)
+    XCTAssertEqual(result.appliedChangeCount, 0)
+    XCTAssertEqual(manager.shortcut(for: .rectangle), "9")
+  }
+
   func testImportAnnotateActionAllowsEmptyShortcutWhileEnabled() {
     let defaults = UserDefaultsFactory.make()
     let manager = AnnotateShortcutManager.shared

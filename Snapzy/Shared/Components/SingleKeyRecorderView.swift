@@ -161,7 +161,7 @@ struct SingleKeyRecorderView: View {
 
       // Get character (lowercase for consistency)
       if let char = event.charactersIgnoringModifiers?.lowercased().first,
-         char.isLetter {
+         char.isLetter || char.isNumber || char.isPunctuation || char.isSymbol {
         _ = onChanged(char)
         stopRecording()
         return nil
