@@ -80,6 +80,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+
+## [1.26.0] - 2026-06-27
+
+### Features
+-  Add spotlight annotation tool with adjustable opacity and corner radius (#297) (4f9e5cb)
+-  Update area capture settings to allow live screen selection and add localization for freeze area option (e05bf57)
+
+### Bug Fixes
+-  increase menu bar icon scale (#301) (39aa146)
+
+### Chore
+- refactor: Add spotlight opacity property to annotation state and test persistence (21b9090)
+- chore: Add localization for menu bar icon descriptions and titles in multiple languages (c6c22fd)
+- chore: update appcast, cask, and readme for v1.25.2 (0609f2d)
+
+### Contributors
+- @duongductrong
+- @github-actions[bot]
+- @j178
+- @rv4no
+- @vxirau
+
 ## [1.25.2] - 2026-06-26
 
 ### Bug Fixes
