@@ -300,6 +300,27 @@ final class ScreenCaptureManager: ObservableObject {
     defer { isCapturing = false }
     DiagnosticLogger.shared.log(.info, .capture, "Frozen display snapshot capture started")
 
+    return try await captureDisplaySnapshotsCore(
+      displayIDs: displayIDs,
+      showCursor: showCursor,
+      excludeDesktopIcons: excludeDesktopIcons,
+      excludeDesktopWidgets: excludeDesktopWidgets,
+      excludeOwnApplication: excludeOwnApplication,
+      prefetchedContentTask: prefetchedContentTask
+    )
+  }
+
+  /// Core display snapshot logic without `isCapturing` management. Callers that
+  /// already manage their own `isCapturing` lifecycle (e.g. `captureArea` composite
+  /// path) use this directly to avoid double-setting the flag.
+  private func captureDisplaySnapshotsCore(
+    displayIDs: Set<CGDirectDisplayID>? = nil,
+    showCursor: Bool = false,
+    excludeDesktopIcons: Bool = false,
+    excludeDesktopWidgets: Bool = false,
+    excludeOwnApplication: Bool = false,
+    prefetchedContentTask: ShareableContentPrefetchTask? = nil
+  ) async throws -> [CGDirectDisplayID: FrozenDisplaySnapshot] {
     let includeDesktopWindows = excludeDesktopIcons || excludeDesktopWidgets
     let content = try await loadShareableContent(
       prefetchedContentTask: prefetchedContentTask,
@@ -927,6 +948,42 @@ final class ScreenCaptureManager: ObservableObject {
     DiagnosticLogger.shared.log(.info, .capture, "Area capture started \(Int(rect.width))x\(Int(rect.height))")
 
     do {
+      let intersectingDisplayIDs = Self.displayIDsIntersecting(rect)
+
+      // Multi-display composite path: when the selection spans ≥2 displays,
+      // capture all intersecting displays in parallel and composite them using
+      // the frozen path's battle-tested algorithm (DRY).
+      if intersectingDisplayIDs.count > 1 {
+        DiagnosticLogger.shared.log(
+          .info,
+          .capture,
+          "Area capture spans multiple displays, using composite path",
+          context: [
+            "displayCount": "\(intersectingDisplayIDs.count)",
+            "rect": "\(Int(rect.origin.x)),\(Int(rect.origin.y)) \(Int(rect.width))x\(Int(rect.height))",
+          ]
+        )
+
+        let compositeResult = try await captureAreaComposite(
+          rect: rect,
+          displayIDs: intersectingDisplayIDs,
+          showCursor: showCursor,
+          excludeDesktopIcons: excludeDesktopIcons,
+          excludeDesktopWidgets: excludeDesktopWidgets,
+          excludeOwnApplication: excludeOwnApplication,
+          prefetchedContentTask: prefetchedContentTask
+        )
+
+        return await saveImage(
+          compositeResult.image,
+          to: saveDirectory,
+          fileName: fileName,
+          format: format,
+          scaleFactor: compositeResult.scaleFactor
+        )
+      }
+
+      // Single-display optimized path (existing behavior, unchanged).
       let context = try await makePreparedAreaCaptureContext(
         rect: rect,
         showCursor: showCursor,
@@ -1226,6 +1283,22 @@ final class ScreenCaptureManager: ObservableObject {
       throw unavailableError
     }
 
+    // Multi-display composite path for OCR/cutout: when the selection spans
+    // ≥2 displays, capture and composite all intersecting displays.
+    let intersectingDisplayIDs = Self.displayIDsIntersecting(rect)
+    if intersectingDisplayIDs.count > 1 {
+      let compositeResult = try await captureAreaComposite(
+        rect: rect,
+        displayIDs: intersectingDisplayIDs,
+        showCursor: false,
+        excludeDesktopIcons: excludeDesktopIcons,
+        excludeDesktopWidgets: excludeDesktopWidgets,
+        excludeOwnApplication: excludeOwnApplication,
+        prefetchedContentTask: prefetchedContentTask
+      )
+      return compositeResult.image
+    }
+
     let context = try await makePreparedAreaCaptureContext(
       rect: rect,
       showCursor: false,
@@ -1407,6 +1480,98 @@ final class ScreenCaptureManager: ObservableObject {
       }
     }
     return bestIndex
+  }
+
+  /// Returns all display IDs whose screen frame intersects with the given rect.
+  /// When only one display intersects, the caller can use the optimized
+  /// single-display path; when ≥2 intersect, the caller switches to the
+  /// multi-display composite path. Exposed (internal) for unit-testing.
+  nonisolated static func displayIDsIntersecting(_ rect: CGRect) -> Set<CGDirectDisplayID> {
+    var result = Set<CGDirectDisplayID>()
+    for screen in NSScreen.screens {
+      guard let displayID = screen.displayID else { continue }
+      if screen.frame.intersects(rect) {
+        result.insert(displayID)
+      }
+    }
+    return result
+  }
+
+  // MARK: - Multi-Display Area Composite
+
+  /// Captures all intersecting displays in parallel and composites them into a
+  /// single image using `FrozenAreaCaptureSession.cropCompositeImage`. This
+  /// reuses the frozen path's battle-tested multi-display composite algorithm
+  /// (DRY) for the live area capture path when a selection spans ≥2 displays.
+  ///
+  /// The caller (`captureArea` / `captureAreaAsImage`) already manages
+  /// `isCapturing`, so this method uses `captureDisplaySnapshotsCore` to avoid
+  /// double-setting the flag.
+  private func captureAreaComposite(
+    rect: CGRect,
+    displayIDs: Set<CGDirectDisplayID>,
+    showCursor: Bool,
+    excludeDesktopIcons: Bool,
+    excludeDesktopWidgets: Bool,
+    excludeOwnApplication: Bool,
+    prefetchedContentTask: ShareableContentPrefetchTask?
+  ) async throws -> FrozenAreaCropResult {
+    // 1. Capture all intersecting displays in parallel (uses core method to
+    //    avoid isCapturing double-set since our caller already manages it).
+    let snapshots = try await captureDisplaySnapshotsCore(
+      displayIDs: displayIDs,
+      showCursor: showCursor,
+      excludeDesktopIcons: excludeDesktopIcons,
+      excludeDesktopWidgets: excludeDesktopWidgets,
+      excludeOwnApplication: excludeOwnApplication,
+      prefetchedContentTask: prefetchedContentTask
+    )
+
+    // 2. Create a temporary session from the captured snapshots (DRY: reuses
+    //    the frozen path's FrozenAreaCaptureSession without any freeze UI).
+    let session = FrozenAreaCaptureSession.fromSnapshots(Array(snapshots.values))
+
+    // 3. Determine the primary display (largest intersection) for the
+    //    AreaSelectionResult. This mirrors how AreaSelectionWindow picks the
+    //    primary display during selection.
+    let screens = NSScreen.screens
+    let frames = screens.map(\.frame)
+    let primaryIndex = Self.indexOfLargestIntersectingFrame(frames: frames, rect: rect)
+    let primaryDisplayID: CGDirectDisplayID
+    if let primaryIndex, let displayID = screens[primaryIndex].displayID {
+      primaryDisplayID = displayID
+    } else {
+      primaryDisplayID = displayIDs.first ?? CGMainDisplayID()
+    }
+
+    // 4. Build the selection result that the composite algorithm expects.
+    let selectionResult = AreaSelectionResult(
+      target: .rect(rect),
+      displayID: primaryDisplayID,
+      mode: .screenshot,
+      displayIDs: displayIDs
+    )
+
+    // 5. Composite using the frozen path's algorithm: per-display intersection,
+    //    coordinate transforms, pixel alignment, scale normalization, vImage
+    //    promotion, sharpening, and CGContext compositing.
+    let compositeResult = try session.cropCompositeImage(
+      for: selectionResult,
+      minimumOutputScaleFactor: preferredScreenshotOutputScaleFactor
+    )
+
+    DiagnosticLogger.shared.log(
+      .info,
+      .capture,
+      "Area composite completed",
+      context: [
+        "displays": "\(displayIDs.count)",
+        "outputSize": "\(compositeResult.image.width)x\(compositeResult.image.height)",
+        "scaleFactor": String(format: "%.2f", Double(compositeResult.scaleFactor)),
+      ]
+    )
+
+    return compositeResult
   }
 
   func makeAreaStreamConfiguration(

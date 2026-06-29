@@ -345,4 +345,104 @@ final class ScreenCaptureAreaCropTests: XCTestCase {
     }
     return total / (width * height)
   }
+
+  // MARK: - Cross-Display Composite (live multi-display area capture)
+
+  func test_straddle_multiDisplayDetection_singleDisplayRectReturnsSingleID() {
+    // Simulates the logic that displayIDsIntersecting would use:
+    // rect fully inside display A → only 1 display intersects.
+    let displays: [CGRect] = [
+      CGRect(x: 0, y: 0, width: 1440, height: 900),    // A
+      CGRect(x: 1440, y: 0, width: 2560, height: 1440), // B
+    ]
+    let selection = CGRect(x: 100, y: 100, width: 400, height: 300)
+
+    let intersecting = displays.filter { $0.intersects(selection) }
+    XCTAssertEqual(intersecting.count, 1, "Selection fully inside display A → only 1 display")
+  }
+
+  func test_straddle_multiDisplayDetection_crossDisplayRectReturnsMultipleIDs() {
+    // rect spanning A and B → 2 displays intersect.
+    let displays: [CGRect] = [
+      CGRect(x: 0, y: 0, width: 1440, height: 900),    // A
+      CGRect(x: 1440, y: 0, width: 2560, height: 1440), // B
+    ]
+    let selection = CGRect(x: 1200, y: 100, width: 500, height: 300)
+
+    let intersecting = displays.filter { $0.intersects(selection) }
+    XCTAssertEqual(intersecting.count, 2, "Selection spanning A and B → 2 displays")
+  }
+
+  func test_straddle_multiDisplayDetection_noIntersectionReturnsEmpty() {
+    let displays: [CGRect] = [
+      CGRect(x: 0, y: 0, width: 1440, height: 900),
+    ]
+    let selection = CGRect(x: 5000, y: 5000, width: 100, height: 100)
+
+    let intersecting = displays.filter { $0.intersects(selection) }
+    XCTAssertTrue(intersecting.isEmpty, "Selection outside all displays → empty")
+  }
+
+  func test_straddle_multiDisplayComposite_selectionResultConstructedCorrectly() {
+    // Verify AreaSelectionResult constructed for composite path has correct properties.
+    let rect = CGRect(x: 1200, y: 100, width: 500, height: 300)
+    let displayIDs: Set<CGDirectDisplayID> = [1, 2]
+    let primaryDisplayID: CGDirectDisplayID = 1
+
+    let result = AreaSelectionResult(
+      target: .rect(rect),
+      displayID: primaryDisplayID,
+      mode: .screenshot,
+      displayIDs: displayIDs
+    )
+
+    XCTAssertEqual(result.rect, rect)
+    XCTAssertEqual(result.displayID, primaryDisplayID)
+    XCTAssertTrue(result.spansMultipleDisplays, "displayIDs count > 1 → spans multiple")
+    XCTAssertEqual(result.displayIDs, displayIDs)
+  }
+
+  func test_straddle_multiDisplayComposite_singleDisplaySelectionResultDoesNotSpan() {
+    let rect = CGRect(x: 100, y: 100, width: 400, height: 300)
+    let displayIDs: Set<CGDirectDisplayID> = [1]
+
+    let result = AreaSelectionResult(
+      target: .rect(rect),
+      displayID: 1,
+      mode: .screenshot,
+      displayIDs: displayIDs
+    )
+
+    XCTAssertFalse(result.spansMultipleDisplays, "Single display → does not span")
+  }
+
+  func test_straddle_primaryDisplayPick_matchesLargestIntersection() {
+    // For composite path, primary display must be the one with largest overlap.
+    let displays: [CGRect] = [
+      CGRect(x: 0, y: 0, width: 1440, height: 900),    // A
+      CGRect(x: 1440, y: 0, width: 2560, height: 1440), // B
+    ]
+    // Selection: x 1200–1700. A intersection: 1200–1440 = 240px. B intersection: 1440–1700 = 260px.
+    let selection = CGRect(x: 1200, y: 100, width: 500, height: 300)
+
+    let bestIndex = ScreenCaptureManager.indexOfLargestIntersectingFrame(
+      frames: displays,
+      rect: selection
+    )
+    XCTAssertEqual(bestIndex, 1, "B has larger overlap (260×300 vs 240×300)")
+  }
+
+  func test_straddle_branchingCondition_countsIntersectingDisplaysCorrectly() {
+    // Simulate 3-display setup with selection spanning first two.
+    let displays: [CGRect] = [
+      CGRect(x: 0, y: 0, width: 1440, height: 900),
+      CGRect(x: 1440, y: 0, width: 2560, height: 1440),
+      CGRect(x: 4000, y: 0, width: 1920, height: 1080),
+    ]
+    let selection = CGRect(x: 1200, y: 100, width: 500, height: 300)
+
+    let intersecting = displays.filter { $0.intersects(selection) }
+    XCTAssertEqual(intersecting.count, 2, "Selection only spans first two displays")
+    XCTAssertTrue(intersecting.count > 1, "Composite path should activate")
+  }
 }
