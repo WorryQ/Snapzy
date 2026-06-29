@@ -224,14 +224,27 @@ final class AnnotateWindowController: NSWindowController, NSWindowDelegate {
   }
 
   private func discardEditsAndClose() -> Bool {
-    guard let quickAccessItemId else { return false }
-    DiagnosticLogger.shared.log(
-      .info,
-      .action,
-      "Annotate window closed via Esc, discarding edits",
-      context: ["itemId": quickAccessItemId.uuidString]
-    )
-    forceClose()
+    guard let window = self.window else { return false }
+    if let quickAccessItemId {
+      DiagnosticLogger.shared.log(
+        .info,
+        .action,
+        "Annotate window close request via Esc",
+        context: ["itemId": quickAccessItemId.uuidString]
+      )
+    } else {
+      DiagnosticLogger.shared.log(
+        .info,
+        .action,
+        "Annotate window close request via Esc"
+      )
+    }
+
+    if state.hasUnsavedChanges {
+      showUnsavedChangesAlert(for: window)
+    } else {
+      forceClose()
+    }
     return true
   }
 
