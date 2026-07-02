@@ -261,6 +261,7 @@ final class RecordingToolbarWindow: NSWindow {
       recorder: recorder,
       audioLevelMeter: recorder.audioLevelMeter,
       annotationState: annotationState,
+      state: state,
       onDelete: { [weak self] in self?.onDelete?() },
       onRestart: { [weak self] in self?.onRestart?() },
       onStop: { [weak self] in self?.onStop?() },

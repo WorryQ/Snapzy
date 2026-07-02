@@ -23,6 +23,7 @@ struct RecordingStatusBarView: View {
   @ObservedObject var recorder: ScreenRecordingManager
   @ObservedObject var audioLevelMeter: RecordingAudioLevelMeter
   @ObservedObject var annotationState: RecordingAnnotationState
+  @ObservedObject var state: RecordingToolbarState
   let onDelete: () -> Void
   let onRestart: () -> Void
   let onStop: () -> Void
@@ -31,6 +32,12 @@ struct RecordingStatusBarView: View {
   var onAnnotateButtonLayout: ((CGFloat) -> Void)?
 
   @State private var indicatorOpacity: Double = 1.0
+
+  /// Show the audio waveform only when it accurately describes the recording:
+  /// microphone is being captured and the output supports audio (GIF has none).
+  private var shouldShowWaveform: Bool {
+    state.captureMicrophone && state.outputMode != .gif
+  }
 
   var body: some View {
     HStack(spacing: ToolbarConstants.itemSpacing) {
@@ -125,15 +132,19 @@ struct RecordingStatusBarView: View {
     .coordinateSpace(name: "statusBar")
     .padding(.horizontal, ToolbarConstants.horizontalPadding)
     .padding(.vertical, ToolbarConstants.verticalPadding)
-    .background(
-      RecordingWaveformView(
-        level: audioLevelMeter.level,
-        isActive: recorder.isRecording && !recorder.isPaused
-      )
-      .opacity(recorder.isPaused ? 0.35 : 1.0)
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
-    )
+    .background {
+      // Hidden entirely (not just faded) when no mic audio is captured so the
+      // TimelineView animation stops too.
+      if shouldShowWaveform {
+        RecordingWaveformView(
+          level: audioLevelMeter.level,
+          isActive: recorder.isRecording && !recorder.isPaused
+        )
+        .opacity(recorder.isPaused ? 0.35 : 1.0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+      }
+    }
     .onPreferenceChange(AnnotateButtonCenterXKey.self) { centerX in
       onAnnotateButtonLayout?(centerX)
     }
@@ -147,6 +158,7 @@ struct RecordingStatusBarView: View {
     recorder: ScreenRecordingManager.shared,
     audioLevelMeter: ScreenRecordingManager.shared.audioLevelMeter,
     annotationState: RecordingAnnotationState(),
+    state: RecordingToolbarState(),
     onDelete: {},
     onRestart: {},
     onStop: {}
