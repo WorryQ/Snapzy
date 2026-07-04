@@ -1163,50 +1163,6 @@ final class ScreenCaptureViewModel: ObservableObject, KeyboardShortcutDelegate {
         }
       }
     }
-
-    // Capture a dynamic backdrop in the background for live-mode luma calculations (consumed by the
-    // adaptive light/dark inside-selection overlay) and magnifying glass zoom (which requires backdrop
-    // pixels to render the magnified view under the cursor crosshair in both modes).
-    let targetDisplayID = ScreenUtility.activeDisplayID()
-    if let screen = NSScreen.screens.first(where: { $0.displayID == targetDisplayID }) {
-      let screenFrame = screen.frame
-      let backingScale = screen.backingScaleFactor
-      let sessionID = activeAreaSelectionSessionID
-
-      // Capture off the main thread. CGWindowListCreateImage is a heavy full-screen composite;
-      // running it synchronously on the main actor blocks the run loop and lets WindowServer reset
-      // the crosshair to the arrow during overlay present / first drag. Task.detached keeps it on
-      // the cooperative pool. The backdrop is invisible and only feeds luma sampling, so a small
-      // delay before it lands is acceptable.
-      Task { [weak self] in
-        let backdrop = await Task.detached { () -> AreaSelectionBackdrop? in
-          guard let cgImage = CGWindowListCreateImage(
-            screenFrame,
-            .optionOnScreenOnly,
-            kCGNullWindowID,
-            .nominalResolution
-          ) else { return nil }
-          return AreaSelectionBackdrop(
-            displayID: targetDisplayID,
-            image: cgImage,
-            scaleFactor: backingScale,
-            isVisible: false
-          )
-        }.value
-
-        // Session may have ended/restarted while the async capture ran.
-        guard let self, self.activeAreaSelectionSessionID == sessionID else { return }
-        guard let backdrop else {
-          DiagnosticLogger.shared.log(
-            .warning,
-            .capture,
-            "Failed to capture fast background backdrop for live luma calculations using CGWindowListCreateImage"
-          )
-          return
-        }
-        AreaSelectionController.shared.applyBackdrop(backdrop, for: targetDisplayID)
-      }
-    }
   }
 
 

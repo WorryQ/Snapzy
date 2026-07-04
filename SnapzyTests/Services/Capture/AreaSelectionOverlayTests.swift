@@ -526,6 +526,43 @@ final class AreaSelectionOverlayTests: XCTestCase {
     // Zoom should increase (1.0 + 1.0 = 2.0)
     XCTAssertEqual(overlayView.testMagnifierZoom, 2.0)
   }
+
+  func testMagnifierZoom_worksWithEmptyBackdropsInitially() {
+    let controller = AreaSelectionController.shared
+
+    // GIVEN: Starting selection session with empty backdrops (backdrop-less mode)
+    let expectation = XCTestExpectation(description: "Backdrop snapshot automatically generated")
+
+    controller.startSelection(mode: .recording) { _, _ in }
+
+    // Wait a brief moment for async CGWindowListCreateImage task to finish and apply the backdrop
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+      // Find active window in pool
+      let targetDisplayID = ScreenUtility.activeDisplayID()
+      let mirror = Mirror(reflecting: controller)
+      if let pool = mirror.children.first(where: { $0.label == "windowPool" })?.value as? [CGDirectDisplayID: AreaSelectionWindow],
+         let window = pool[targetDisplayID] {
+        XCTAssertNotNil(window.overlayView.testSnapshotLayer.contents)
+      }
+      controller.cancelSelection()
+      expectation.fulfill()
+    }
+
+    wait(for: [expectation], timeout: 3.0)
+  }
+
+  func testCoordinatesIndicator_visibleOnStartSelectionWithoutMouseMove() {
+    // 1. GIVEN: overlayView with selection enabled, manual mode, and not selecting
+    overlayView.setSelectionEnabled(true)
+    overlayView.setInteractionMode(.manualRegion, resetSelection: false)
+
+    // 2. WHEN: resetSelection is called
+    overlayView.resetSelection()
+
+    // 3. THEN: The coordinate label text layer and background layer should be visible
+    XCTAssertFalse(overlayView.testSizeIndicatorTextLayer.isHidden)
+    XCTAssertFalse(overlayView.testSizeIndicatorBackgroundLayer.isHidden)
+  }
 }
 
 

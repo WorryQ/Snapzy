@@ -97,6 +97,10 @@ final class AreaSelectionController: NSObject {
   /// Re-asserts the crosshair if the app regains focus mid-drag (e.g. after a background capture
   /// tool bounces focus). Installed alongside the drag monitors, torn down with them.
   private var appActivationObserver: Any?
+  private var sessionSpaceChangeObserver: Any?
+  private var sessionAppActivationObserver: Any?
+  private var sessionAppSwitchObserver: Any?
+  private var lumaRecapturingTask: Task<Void, Never>?
   private var isMovingManualSelection = false
   private var manualSelectionLastPointerLocation: CGPoint?
   private var previouslyActiveApplication: NSRunningApplication?
@@ -382,6 +386,34 @@ final class AreaSelectionController: NSObject {
     keyboardOwnerDisplayID = resolvedKeyboardOwnerDisplayID()
     isPresenting = true
 
+    // Observe space changes and activation to keep selection session robust
+    sessionSpaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.activeSpaceDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { @MainActor [weak self] _ in
+      self?.handleSessionSpaceOrActivationChange()
+      self?.recaptureBackdropsForLuma()
+    }
+
+    sessionAppActivationObserver = NotificationCenter.default.addObserver(
+      forName: NSApplication.didBecomeActiveNotification,
+      object: nil,
+      queue: .main
+    ) { @MainActor [weak self] _ in
+      self?.handleSessionSpaceOrActivationChange()
+      self?.recaptureBackdropsForLuma()
+    }
+
+    sessionAppSwitchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didActivateApplicationNotification,
+      object: nil,
+      queue: .main
+    ) { @MainActor [weak self] _ in
+      self?.handleSessionSpaceOrActivationChange()
+      self?.recaptureBackdropsForLuma()
+    }
+
     // Ensure pool is ready (lazy initialization if not called at app launch)
     if !isPoolReady {
       prepareWindowPool()
@@ -429,6 +461,43 @@ final class AreaSelectionController: NSObject {
     }
 
     startWindowSelectionPreparationIfNeeded()
+
+    if selectionBackdrops.isEmpty {
+      let targetDisplayID = ScreenUtility.activeDisplayID()
+      if let screen = NSScreen.screens.first(where: { $0.displayID == targetDisplayID }) {
+        let screenFrame = screen.frame
+        let backingScale = screen.backingScaleFactor
+        let sessionID = selectionSessionID
+
+        Task { [weak self] in
+          let backdrop = await Task.detached { () -> AreaSelectionBackdrop? in
+            guard let cgImage = CGWindowListCreateImage(
+              screenFrame,
+              .optionOnScreenOnly,
+              kCGNullWindowID,
+              .nominalResolution
+            ) else { return nil }
+            return AreaSelectionBackdrop(
+              displayID: targetDisplayID,
+              image: cgImage,
+              scaleFactor: backingScale,
+              isVisible: false
+            )
+          }.value
+
+          guard let self, self.selectionSessionID == sessionID else { return }
+          guard let backdrop else {
+            DiagnosticLogger.shared.log(
+              .warning,
+              .capture,
+              "Failed to capture background backdrop for magnifier zoom in backdrop-less session"
+            )
+            return
+          }
+          self.applyBackdrop(backdrop, for: targetDisplayID)
+        }
+      }
+    }
 
     if keyboardOwnerDisplayID == nil {
       // Set up session key monitoring only when the overlay cannot own keyboard input directly.
@@ -633,6 +702,100 @@ final class AreaSelectionController: NSObject {
     displayActivationHandler?(displayID)
   }
 
+  private func handleSessionSpaceOrActivationChange() {
+    guard isPresenting else { return }
+
+    DiagnosticLogger.shared.log(
+      .info,
+      .capture,
+      "Area selection session handling space or activation change",
+      context: [
+        "isPresenting": "\(isPresenting)",
+        "isActive": "\(NSApp.isActive)",
+        "keyboardOwnerDisplayID": keyboardOwnerDisplayID.map { "\($0)" } ?? "nil"
+      ]
+    )
+
+    // Reactivate Snapzy so that cursor rects and key events work correctly
+    if !NSApp.isActive {
+      NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // Restore key focus to the keyboard owner window
+    if let keyboardDisplay = keyboardOwnerDisplayID,
+       let keyWindow = windowPool[keyboardDisplay] {
+      if !keyWindow.isKeyWindow {
+        keyWindow.makeKey()
+        keyWindow.makeFirstResponder(keyWindow.overlayView)
+      }
+    }
+
+    // Refresh and invalidate cursors for all windows in the pool, and ensure visibility
+    for (_, window) in windowPool {
+      window.orderFrontRegardless()
+      window.invalidateCursorRects(for: window.overlayView)
+      window.overlayView.refreshCursor()
+      window.overlayView.needsDisplay = true
+    }
+  }
+
+  private func recaptureBackdropsForLuma() {
+    guard isPresenting else { return }
+
+    // Cancel any pending recapture to debounce rapid switches
+    lumaRecapturingTask?.cancel()
+
+    lumaRecapturingTask = Task { @MainActor in
+      // Wait 300ms for space-sliding / window-order animation transitions to settle
+      do {
+        try await Task.sleep(nanoseconds: 300_000_000)
+      } catch {
+        return // Task cancelled
+      }
+
+      guard isPresenting else { return }
+
+      DiagnosticLogger.shared.log(
+        .info,
+        .capture,
+        "Recapturing backdrops for live-mode luma calculations after transition settle",
+        context: [
+          "isPresenting": "\(isPresenting)",
+          "isActive": "\(NSApp.isActive)"
+        ]
+      )
+
+      for screen in NSScreen.screens {
+        guard let displayID = screen.displayID else { continue }
+        let screenFrame = screen.frame
+        let backingScale = screen.backingScaleFactor
+        let sessionID = self.selectionSessionID
+
+        Task { [weak self] in
+          let backdrop = await Task.detached { () -> AreaSelectionBackdrop? in
+            guard let cgImage = CGWindowListCreateImage(
+              screenFrame,
+              .optionOnScreenOnly,
+              kCGNullWindowID,
+              .nominalResolution
+            ) else { return nil }
+            return AreaSelectionBackdrop(
+              displayID: displayID,
+              image: cgImage,
+              scaleFactor: backingScale,
+              isVisible: false
+            )
+          }.value
+
+          guard let self, self.selectionSessionID == sessionID else { return }
+          if let backdrop {
+            self.applyBackdrop(backdrop, for: displayID)
+          }
+        }
+      }
+    }
+  }
+
   private func completeSelection(target: AreaSelectionTarget, from window: AreaSelectionWindow) {
     QuickAccessManager.shared.resumeAfterCapture()
     let rect = target.rect
@@ -677,11 +840,37 @@ final class AreaSelectionController: NSObject {
     
     resetCallbacks()
     dismissesAfterSelection = true
+    forceCursorReset()
+  }
 
-    // Ensure cursor is restored to arrow after selection ends.
-    // Window hiding (orderOut) does not always trigger mouseExited,
-    // so the transparent/camera cursor could persist without this.
+  private func forceCursorReset() {
     NSCursor.arrow.set()
+    
+    // Discard cursor rects for all pooled windows before deactivating them
+    for (_, window) in windowPool {
+      window.discardCursorRects()
+      window.invalidateCursorRects(for: window.overlayView)
+    }
+
+    // Post a synthetic mouse-moved event to force macOS to re-evaluate the cursor rects.
+    // Run after a tiny delay so the window orderOut and activation transitions have fully completed.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+      NSCursor.arrow.set()
+      let mouseLocation = NSEvent.mouseLocation
+      if let syntheticEvent = NSEvent.mouseEvent(
+        with: .mouseMoved,
+        location: mouseLocation,
+        modifierFlags: [],
+        timestamp: ProcessInfo.processInfo.systemUptime,
+        windowNumber: 0,
+        context: nil,
+        eventNumber: 0,
+        clickCount: 0,
+        pressure: 0
+      ) {
+        NSApp.postEvent(syntheticEvent, atStart: false)
+      }
+    }
   }
 
   /// Cancel the current selection
@@ -700,11 +889,7 @@ final class AreaSelectionController: NSObject {
     previouslyActiveApplication = nil
     
     resetCallbacks()
-
-    // Ensure cursor is restored to arrow after cancellation.
-    // Window hiding (orderOut) does not always trigger mouseExited,
-    // so the transparent/camera cursor could persist without this.
-    NSCursor.arrow.set()
+    forceCursorReset()
   }
 
   /// Complete selection with the given rect
@@ -729,6 +914,20 @@ final class AreaSelectionController: NSObject {
 
   private func resetCallbacks() {
     isPresenting = false
+    lumaRecapturingTask?.cancel()
+    lumaRecapturingTask = nil
+    if let observer = sessionSpaceChangeObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(observer)
+      sessionSpaceChangeObserver = nil
+    }
+    if let observer = sessionAppActivationObserver {
+      NotificationCenter.default.removeObserver(observer)
+      sessionAppActivationObserver = nil
+    }
+    if let observer = sessionAppSwitchObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(observer)
+      sessionAppSwitchObserver = nil
+    }
     completion = nil
     completionWithMode = nil
     completionWithResult = nil
@@ -1056,6 +1255,15 @@ final class AreaSelectionController: NSObject {
     if let observer = screenChangeObserver {
       NotificationCenter.default.removeObserver(observer)
     }
+    if let observer = sessionSpaceChangeObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(observer)
+    }
+    if let observer = sessionAppActivationObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    if let observer = sessionAppSwitchObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(observer)
+    }
   }
 }
 
@@ -1084,6 +1292,10 @@ extension AreaSelectionController: AreaSelectionWindowDelegate {
   }
 
   func areaSelectionWindowDidRequestDisplayActivation(_ window: AreaSelectionWindow) {
+    if !NSApp.isActive {
+      handleSessionSpaceOrActivationChange()
+      recaptureBackdropsForLuma()
+    }
     requestDisplayActivationIfNeeded(for: window)
   }
 
@@ -1638,6 +1850,10 @@ final class AreaSelectionOverlayView: NSView {
 
   func refreshCursor() {
     refreshActiveCursor()
+    initializeCrosshairAtCurrentMousePosition()
+    if selectionEnabled {
+      updateCoordinateIndicator(at: currentMousePosition)
+    }
   }
 
   /// Re-assert the crosshair while a manual drag is in progress. On a nonactivating panel the
@@ -1675,7 +1891,11 @@ final class AreaSelectionOverlayView: NSView {
     verticalCrosshairLayer.isHidden = true
     selectionBorderLayer.isHidden = true
     crosshairIndicatorLayer.isHidden = true
-    hideSizeIndicator()
+    if selectionEnabled {
+      updateCoordinateIndicator(at: currentMousePosition)
+    } else {
+      hideSizeIndicator()
+    }
     showSelectionAreaOverlay = UserDefaults.standard.object(forKey: PreferencesKeys.screenshotShowSelectionAreaOverlay) as? Bool ?? true
     magnifier.reverseZoomDirection = UserDefaults.standard.object(forKey: PreferencesKeys.screenshotReverseMagnifierZoomDirection) as? Bool ?? false
     dimLayer.backgroundColor = showSelectionAreaOverlay ? dimColor.cgColor : nil
@@ -1900,6 +2120,9 @@ final class AreaSelectionOverlayView: NSView {
     if magnifier.zoom > 1.0 {
       updateMagnifier(at: currentMousePosition)
     }
+    if selectionEnabled {
+      updateCoordinateIndicator(at: currentMousePosition)
+    }
   }
 
   func clearBackdrop() {
@@ -1979,6 +2202,8 @@ final class AreaSelectionOverlayView: NSView {
       }
     }
   }
+  var testSizeIndicatorTextLayer: CATextLayer { sizeIndicatorTextLayer }
+  var testSizeIndicatorBackgroundLayer: CALayer { sizeIndicatorBackgroundLayer }
 #endif
 
 
