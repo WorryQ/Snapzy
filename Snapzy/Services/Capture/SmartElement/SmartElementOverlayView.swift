@@ -52,7 +52,7 @@ final class SmartElementOverlayView: NSView {
 
   override func resetCursorRects() {
     super.resetCursorRects()
-    addCursorRect(bounds, cursor: .crosshair)
+    addCursorRect(bounds, cursor: NSCursor.applicationWindowCursor)
   }
 
   override func updateTrackingAreas() {
@@ -61,11 +61,23 @@ final class SmartElementOverlayView: NSView {
     addTrackingArea(
       NSTrackingArea(
         rect: bounds,
-        options: [.activeAlways, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect],
+        options: [.activeAlways, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect, .cursorUpdate],
         owner: self,
         userInfo: nil
       )
     )
+  }
+
+  override func cursorUpdate(with event: NSEvent) {
+    NSCursor.applicationWindowCursor.set()
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    NSCursor.applicationWindowCursor.set()
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    NSCursor.arrow.set()
   }
 
   override func layout() {
