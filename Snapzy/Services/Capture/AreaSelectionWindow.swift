@@ -1015,7 +1015,34 @@ final class AreaSelectionController: NSObject {
     keyboardOwnerDisplayID = displayID
     window.setReceivesKeyboardInput(true)
     window.activateKeyboardInputIfNeeded()  // makeKey + makeFirstResponder (nonactivating; no app activation)
+    
+    // Explicitly order the newly-key window front to ensure the Window Server
+    // registers the key status change for this inactive application's panel.
+    window.orderFrontRegardless()
+    
+    // Invalidate cursor rects before the next event
     window.overlayView.refreshCursor()
+    
+    // Post a synthetic mouse-moved event directly to the newly key window.
+    // Since the app is inactive, macOS only evaluates cursor rects if the top window
+    // is the key window and receives a mouse event. The physical mouse movement that
+    // brought us here was already routed to the window beneath us. This synthetic event
+    // forces an immediate re-evaluation using our key window's cursor rects.
+    let mouseLocation = NSEvent.mouseLocation
+    if let syntheticEvent = NSEvent.mouseEvent(
+      with: .mouseMoved,
+      location: mouseLocation,
+      modifierFlags: [],
+      timestamp: ProcessInfo.processInfo.systemUptime,
+      windowNumber: window.windowNumber,
+      context: nil,
+      eventNumber: 0,
+      clickCount: 0,
+      pressure: 0
+    ) {
+      NSApp.postEvent(syntheticEvent, atStart: false)
+    }
+
     DiagnosticLogger.shared.log(
       .debug,
       .capture,
