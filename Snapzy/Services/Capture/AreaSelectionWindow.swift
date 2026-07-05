@@ -476,14 +476,14 @@ final class AreaSelectionController: NSObject {
     if selectionBackdrops.isEmpty {
       let targetDisplayID = ScreenUtility.activeDisplayID()
       if let screen = NSScreen.screens.first(where: { $0.displayID == targetDisplayID }) {
-        let screenFrame = screen.frame
+        let captureRect = CGDisplayBounds(targetDisplayID)
         let backingScale = screen.backingScaleFactor
         let sessionID = selectionSessionID
 
         Task { [weak self] in
           let backdrop = await Task.detached { () -> AreaSelectionBackdrop? in
             guard let cgImage = CGWindowListCreateImage(
-              screenFrame,
+              captureRect,
               .optionOnScreenOnly,
               kCGNullWindowID,
               .nominalResolution
@@ -627,6 +627,12 @@ final class AreaSelectionController: NSObject {
       && selectionBackdrops[displayID] == nil
     liveFallbackDisplayIDs.remove(displayID)
     selectionBackdrops[displayID] = backdrop
+    // Adding the first backdrop flips `selectionBackdrops.isEmpty` false, which changes
+    // `selectionEnabled(for:)` for EVERY display — including secondaries still awaiting their
+    // own backdrop. Reconcile all pooled windows' cached selection-enabled flags so those
+    // displays correctly report "disabled" and route the next click through the live-fallback
+    // path instead of silently dropping the drag. Runs even if `displayID` has no pooled window.
+    reconcileSelectionEnabledAcrossPooledWindows()
     guard let window = windowPool[displayID] else { return }
     if shouldDeferVisualBackdrop {
       // Avoid a visible freeze jump when a secondary display finishes snapshotting mid-drag.
@@ -650,6 +656,19 @@ final class AreaSelectionController: NSObject {
     window.overlayView.activatePendingSelectionIfNeeded()
     window.overlayView.refreshCursor()
     renderManualSelectionIfNeeded()
+  }
+
+  /// Sync every pooled window's cached `selectionEnabled` flag to the authoritative
+  /// `selectionEnabled(for:)` value. The per-view flag is a duplicate of controller state, so it
+  /// goes stale whenever a global change (e.g. the first `applyBackdrop` flipping
+  /// `selectionBackdrops.isEmpty`) alters the gate for displays other than the one being mutated.
+  /// Idempotent and cheap (a bool set per window); only called on rare state transitions, never
+  /// per mouse event — so it does not affect the manual-drag latency/frame-rate budget. Windows
+  /// mid-drag stay enabled because `selectionEnabled(for:)` honors `liveFallbackDisplayIDs`.
+  private func reconcileSelectionEnabledAcrossPooledWindows() {
+    for (displayID, window) in windowPool {
+      window.overlayView.setSelectionEnabled(selectionEnabled(for: displayID))
+    }
   }
 
   func withDisplayOverlayHidden<T>(
@@ -794,13 +813,13 @@ final class AreaSelectionController: NSObject {
 
       for screen in NSScreen.screens {
         guard let displayID = screen.displayID else { continue }
-        let screenFrame = screen.frame
+        let captureRect = CGDisplayBounds(displayID)
         let backingScale = screen.backingScaleFactor
         let sessionID = self.selectionSessionID
         Task { [weak self] in
           let backdrop = await Task.detached { () -> AreaSelectionBackdrop? in
             guard let cgImage = CGWindowListCreateImage(
-              screenFrame,
+              captureRect,
               .optionOnScreenOnly,
               kCGNullWindowID,
               .nominalResolution
