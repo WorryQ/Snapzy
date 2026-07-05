@@ -1892,10 +1892,11 @@ final class AreaSelectionOverlayView: NSView {
     configureOverlayTextLayer(sizeIndicatorTextLayer)
     sizeIndicatorTextLayer.font = coordinateIndicatorFont as CTFont
     sizeIndicatorTextLayer.fontSize = coordinateIndicatorFont.pointSize
-    sizeIndicatorTextLayer.shadowColor = NSColor.black.cgColor
-    sizeIndicatorTextLayer.shadowOffset = CGSize(width: 0.5, height: -1.0)
-    sizeIndicatorTextLayer.shadowRadius = 1.0
-    sizeIndicatorTextLayer.shadowOpacity = 1.0
+    sizeIndicatorTextLayer.foregroundColor = NSColor(white: 0.05, alpha: 1.0).cgColor
+    sizeIndicatorTextLayer.shadowColor = NSColor.white.cgColor
+    sizeIndicatorTextLayer.shadowOffset = CGSize(width: 0.5, height: -0.5)
+    sizeIndicatorTextLayer.shadowRadius = 0.1
+    sizeIndicatorTextLayer.shadowOpacity = 1
     rootLayer.addSublayer(sizeIndicatorTextLayer)
 
     modeHintBackgroundLayer = CALayer()
@@ -2446,7 +2447,7 @@ final class AreaSelectionOverlayView: NSView {
   private var coordinateTextAttributes: [NSAttributedString.Key: Any] {
     [
       .font: coordinateIndicatorFont,
-      .foregroundColor: NSColor.white,
+      .foregroundColor: NSColor(white: 0.15, alpha: 1.0),
     ]
   }
 
