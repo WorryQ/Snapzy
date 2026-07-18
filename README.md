@@ -155,6 +155,7 @@ Snapzy registers the `snapzy://` URL scheme so launchers and automation tools ca
 | Fullscreen screenshot | `snapzy://capture/fullscreen`     |
 | Area screenshot       | `snapzy://capture/area`           |
 | Application window    | `snapzy://capture/application`    |
+| Active window         | `snapzy://capture/active-window`  |
 | Area annotate         | `snapzy://capture/area-annotate`  |
 | Scrolling screenshot  | `snapzy://capture/scrolling`      |
 | OCR text capture      | `snapzy://capture/ocr`            |
@@ -190,7 +191,10 @@ If you need archive, export, or DMG packaging commands, see [docs/BUILD.md](docs
 - [Ask DeepWiki (interactive docs assistant)](https://deepwiki.com/duongductrong/Snapzy)
 - [Docs map for humans and agents](docs/README.md)
 - [Project structure and runtime architecture](docs/STRUCTURE.md)
-- [Capture, recording, and editing flows](docs/CAPTURE.md)
+- [App lifecycle, onboarding, and menu bar](docs/APP_LIFECYCLE.md)
+- Capture: [screenshot flows](docs/CAPTURE.md) · [scrolling capture](docs/SCROLLING_CAPTURE.md) · [recording](docs/RECORDING.md) · [post-capture routing](docs/POST_CAPTURE.md)
+- Editors: [Quick Access](docs/QUICK_ACCESS.md) · [capture history](docs/HISTORY.md) · [Annotate](docs/ANNOTATE.md) · [Video Editor](docs/VIDEO_EDITOR.md)
+- Platform: [cloud upload](docs/CLOUD.md) · [shortcuts & URL scheme](docs/SHORTCUTS.md) · [settings reference](docs/PREFERENCES.md) · [updates & diagnostics](docs/UPDATES.md)
 - [TOML configuration export/import](docs/CONFIGURATION.md)
 - [Build and packaging guide](docs/BUILD.md)
 - [Release and update workflow](docs/RELEASES.md)

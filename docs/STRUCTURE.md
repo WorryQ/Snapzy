@@ -2,6 +2,24 @@
 
 This doc mirrors the current Snapzy codebase and runtime ownership. Keep it in sync with source, not with intended architecture.
 
+## Feature Docs
+
+Separated feature docs cover each runtime area in depth:
+
+- [`CAPTURE.md`](CAPTURE.md) — Screenshot, OCR, cutout, Smart Element, markup flows
+- [`SCROLLING_CAPTURE.md`](SCROLLING_CAPTURE.md) — Long-screenshot sessions, stitching, auto scroll
+- [`RECORDING.md`](RECORDING.md) — Screen/GIF recording pipeline, toolbar, metadata
+- [`POST_CAPTURE.md`](POST_CAPTURE.md) — After-capture routing, destinations, clipboard, formats
+- [`QUICK_ACCESS.md`](QUICK_ACCESS.md) — Floating card stack, actions, countdown, pins
+- [`HISTORY.md`](HISTORY.md) — Capture history, retention, restore, storage cleanup
+- [`ANNOTATE.md`](ANNOTATE.md) — Image annotation editor, sessions, presets, export
+- [`VIDEO_EDITOR.md`](VIDEO_EDITOR.md) — Video trim/zoom/speed editing and export
+- [`CLOUD.md`](CLOUD.md) — Cloud providers, credentials, manual uploads
+- [`SHORTCUTS.md`](SHORTCUTS.md) — Global/overlay shortcut registration and conflicts
+- [`PREFERENCES.md`](PREFERENCES.md) — Settings tabs, preference storage, defaults
+- [`APP_LIFECYCLE.md`](APP_LIFECYCLE.md) — Launch sequence, onboarding, menu bar bootstrap
+- [`UPDATES.md`](UPDATES.md) — Sparkle updater, channels, release flow
+
 ## Runtime Map
 
 ```mermaid
@@ -364,23 +382,23 @@ Directory structure mirrors the app: `SnapzyTests/Services/Cloud/AWSV4SignerTest
 | --- | --- |
 | Localization, String Catalog, alert copy, translated display labels | `Resources/Localization/manifest.json`, `tools/localization/CatalogTool.swift`, `Shared/Localization/L10n.swift`, `docs/LOCALIZATION.md` |
 | New screenshot mode or capture behavior | `Features/Capture/CaptureViewModel.swift`, `Services/Capture/AreaSelectionWindow.swift`, `Services/Capture/SmartElement/`, `Services/Capture/ScreenCaptureManager.swift`, `Services/Capture/WindowSelectionQueryService.swift`, `docs/CAPTURE.md` |
-| Scrolling capture UX or stitching | `Services/Capture/ScrollingCapture/` |
-| Recording toolbar, overlays, GIF flow | `Features/Recording/`, `Services/Capture/ScreenRecordingManager.swift` |
-| Post-capture actions or temp-file logic | `Features/Preferences/PreferencesManager.swift`, `Services/Capture/PostCaptureActionHandler.swift`, `Services/Capture/TempCaptureManager.swift`, `Features/QuickAccess/` |
-| Annotate editor (full + inline) | `Features/Annotate/` |
-| Editable screenshot annotation history | `Features/Annotate/Services/AnnotationSessionStore.swift`, `Features/Annotate/Models/PersistedAnnotationSession.swift`, `Features/History/`, `Services/History/CaptureHistoryRetentionService.swift` |
-| Video editor or Smart Camera | `Features/VideoEditor/`, `Services/Capture/RecordingMetadata.swift` |
-| Cloud upload/config transfer | `Services/Cloud/`, `Features/Preferences/Components/PreferencesCloudSettingsView.swift`, `Features/QuickAccess/Components/QuickAccessCardView.swift`, `Features/Annotate/Components/AnnotateBottomBarView.swift` |
+| Scrolling capture UX or stitching | `Services/Capture/ScrollingCapture/`, `docs/SCROLLING_CAPTURE.md` |
+| Recording toolbar, overlays, GIF flow | `Features/Recording/`, `Services/Capture/ScreenRecordingManager.swift`, `docs/RECORDING.md` |
+| Post-capture actions or temp-file logic | `Features/Preferences/PreferencesManager.swift`, `Services/Capture/PostCaptureActionHandler.swift`, `Services/Capture/TempCaptureManager.swift`, `Features/QuickAccess/`, `docs/POST_CAPTURE.md`, `docs/QUICK_ACCESS.md` |
+| Annotate editor (full + inline) | `Features/Annotate/`, `docs/ANNOTATE.md` |
+| Editable screenshot annotation history | `Features/Annotate/Services/AnnotationSessionStore.swift`, `Features/Annotate/Models/PersistedAnnotationSession.swift`, `Features/History/`, `Services/History/CaptureHistoryRetentionService.swift`, `docs/ANNOTATE.md`, `docs/HISTORY.md` |
+| Video editor or Smart Camera | `Features/VideoEditor/`, `Services/Capture/RecordingMetadata.swift`, `docs/VIDEO_EDITOR.md` |
+| Cloud upload/config transfer | `Services/Cloud/`, `Features/Preferences/Components/PreferencesCloudSettingsView.swift`, `Features/QuickAccess/Components/QuickAccessCardView.swift`, `Features/Annotate/Components/AnnotateBottomBarView.swift`, `docs/CLOUD.md` |
 | TOML config export/import + startup auto-apply | `Services/Configuration/`, `Features/Onboarding/Components/OnboardingConfigAccessView.swift`, `Features/Preferences/Components/PreferencesAdvancedSettingsView.swift`, `App/AppCoordinator.swift`, `docs/CONFIGURATION.md` |
-| Onboarding or app startup | `App/`, `Features/Splash/`, `Features/Onboarding/` |
-| Shortcuts and conflicts | `Services/Shortcuts/`, `Features/Shortcuts/` |
+| Onboarding or app startup | `App/`, `Features/Splash/`, `Features/Onboarding/`, `docs/APP_LIFECYCLE.md` |
+| Shortcuts and conflicts | `Services/Shortcuts/`, `Features/Shortcuts/`, `docs/SHORTCUTS.md` |
 | Unit tests for services | `SnapzyTests/Services/`, `SnapzyTests/Helpers/` |
 | UI tests for user flows | `SnapzyUITests/Features/` |
 | Test fixtures and mocks | `SnapzyTests/Helpers/`, `SnapzyTests/Fixtures/` |
 
 ## Current Behavior Clarifications
 
-- The cloud upload action display condition depends on Quick Actions configured in Quick Access (Preferences -> Quick Access -> Quick Actions); it does not auto-run inside `PostCaptureActionHandler`.
+- Cloud upload is manual-only. The `AfterCaptureAction.uploadToCloud` after-capture option was removed (commit `dd4ccd5`), so nothing auto-uploads inside `PostCaptureActionHandler`. Manual upload entry points live in Quick Access cards, Annotate, Video Editor, and History; they show when `CloudManager.isConfigured` is true, and Quick Access / editor surfaces additionally require the `uploadToCloud` action to be enabled in `QuickAccessActionConfigurationStore` (Preferences → Quick Access → Quick Actions).
 - Quick Access can outlive the original capture location: saved captures stay in the export folder, temp captures are deleted when dismissed unless the user explicitly saves them.
 - Two-finger swipe-to-dismiss is scoped to the Quick Access preview card and follows the same side-aware dismiss direction as mouse swipe: rightward on right-side panels, leftward on left-side panels.
 - Committed screenshot annotations are stored as sidecar packages in Application Support. History/Quick Access restore uses those packages to reopen editable annotations after the rendered screenshot has been saved, while delete, clear-history, retention sweep, and temp-to-export save paths remove or move sidecars with the source file.
