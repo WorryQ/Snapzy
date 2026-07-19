@@ -566,7 +566,7 @@ final class AnnotateExporter {
         snapshot.embeddedCGImages[assetId]
       }
     )
-    for annotation in snapshot.annotations {
+    for annotation in snapshot.annotations.renderOrdered {
       if case .spotlight = annotation.type { continue }
       // Only include annotations that intersect with crop bounds
       if let cropRect = snapshot.cropRect {
@@ -1036,7 +1036,7 @@ final class AnnotateExporter {
         snapshot.embeddedCGImages[assetId]
       }
     )
-    for annotation in snapshot.annotations {
+    for annotation in snapshot.annotations.renderOrdered {
       if let cropRect = snapshot.cropRect {
         guard annotation.bounds.intersects(cropRect) else { continue }
       }

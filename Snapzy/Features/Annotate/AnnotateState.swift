@@ -2784,8 +2784,8 @@ final class AnnotateState: ObservableObject {
   }
 
   func selectAnnotation(at point: CGPoint) -> AnnotationItem? {
-    // Find annotation at point (in reverse order to select topmost)
-    for annotation in annotations.reversed() {
+    // Find annotation at point (in reverse render order to select topmost)
+    for annotation in annotations.renderOrdered.reversed() {
       // Quick bounds check first (optimization)
       let expandedBounds = annotation.selectionBounds.insetBy(dx: -10, dy: -10)
       guard expandedBounds.contains(point) else { continue }
@@ -2833,48 +2833,11 @@ final class AnnotateState: ObservableObject {
 
     let oldBounds = annotations[index].resizeBounds
     let normalizedBounds = bounds.standardized
-
-    if case .text = annotations[index].type,
-       annotations[index].properties.textPresentation == .callout,
-       let tailTarget = annotations[index].properties.calloutTailTarget {
-      if TextBubbleGeometry.isDefaultTail(tailTarget, for: oldBounds, fontSize: annotations[index].properties.fontSize) {
-        annotations[index].properties.calloutTailTarget = defaultCalloutTailTarget(for: normalizedBounds, fontSize: annotations[index].properties.fontSize)
-      } else if oldBounds.size == normalizedBounds.size {
-        annotations[index].properties.calloutTailTarget = CGPoint(
-          x: tailTarget.x + normalizedBounds.minX - oldBounds.minX,
-          y: tailTarget.y + normalizedBounds.minY - oldBounds.minY
-        )
-      }
-    }
-    annotations[index].bounds = normalizedBounds
+    annotations[index] = annotations[index].applyingResizeBounds(normalizedBounds)
 
     if case .text = annotations[index].type,
        abs(oldBounds.width - normalizedBounds.width) > 0.5 {
       autoSizingTextAnnotationIDs.remove(id)
-    }
-
-    // Also update embedded coordinates for arrows/lines/paths
-    switch annotations[index].type {
-    case .arrow(let geometry):
-      let updated = geometry.remapped(from: oldBounds, to: normalizedBounds)
-      annotations[index].type = .arrow(updated)
-      annotations[index].bounds = updated.bounds()
-    case .line(let start, let end):
-      annotations[index].type = .line(
-        start: remapPoint(start, from: oldBounds, to: normalizedBounds),
-        end: remapPoint(end, from: oldBounds, to: normalizedBounds)
-      )
-    case .path(let points):
-      annotations[index].type = .path(points.map { remapPoint($0, from: oldBounds, to: normalizedBounds) })
-    case .highlight(let points):
-      annotations[index].type = .highlight(points.map { remapPoint($0, from: oldBounds, to: normalizedBounds) })
-    case .counter:
-      let diameter = max(normalizedBounds.width, normalizedBounds.height)
-      let updatedCounterBounds = counterBounds(center: CGPoint(x: normalizedBounds.midX, y: normalizedBounds.midY), controlValue: AnnotationProperties.controlValue(forCounterDiameter: diameter))
-      annotations[index].bounds = updatedCounterBounds
-      annotations[index].properties.strokeWidth = AnnotationProperties.controlValue(forCounterDiameter: diameter)
-    default:
-      break
     }
 
     if isCombineMode, combineMode == .freeCanvas,
@@ -4911,28 +4874,6 @@ final class AnnotateState: ObservableObject {
     default:
       break
     }
-  }
-
-  private func remapPoint(_ point: CGPoint, from oldBounds: CGRect, to newBounds: CGRect) -> CGPoint {
-    CGPoint(
-      x: remapCoordinate(point.x, oldMin: oldBounds.minX, oldSize: oldBounds.width, newMin: newBounds.minX, newSize: newBounds.width),
-      y: remapCoordinate(point.y, oldMin: oldBounds.minY, oldSize: oldBounds.height, newMin: newBounds.minY, newSize: newBounds.height)
-    )
-  }
-
-  private func remapCoordinate(
-    _ value: CGFloat,
-    oldMin: CGFloat,
-    oldSize: CGFloat,
-    newMin: CGFloat,
-    newSize: CGFloat
-  ) -> CGFloat {
-    guard oldSize != 0 else {
-      return newMin + newSize / 2
-    }
-
-    let progress = (value - oldMin) / oldSize
-    return newMin + progress * newSize
   }
 }
 

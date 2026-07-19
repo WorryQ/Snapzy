@@ -16,6 +16,8 @@ nonisolated struct AnnotationRenderer {
   let context: CGContext
   var editingTextId: UUID?
   var sourceImage: NSImage?
+  /// Pre-resolved `sourceImage` CGImage; avoids re-resolving per blur per frame.
+  var sourceCGImage: CGImage?
   var blurCacheManager: BlurCacheManager?
   private var interactiveBlurAnnotationIds: Set<UUID>
   var interactiveEmbeddedImageAnnotationId: UUID?
@@ -26,6 +28,7 @@ nonisolated struct AnnotationRenderer {
     context: CGContext,
     editingTextId: UUID? = nil,
     sourceImage: NSImage? = nil,
+    sourceCGImage: CGImage? = nil,
     blurCacheManager: BlurCacheManager? = nil,
     interactiveBlurAnnotationId: UUID? = nil,
     interactiveBlurAnnotationIds: Set<UUID> = [],
@@ -36,6 +39,7 @@ nonisolated struct AnnotationRenderer {
     self.context = context
     self.editingTextId = editingTextId
     self.sourceImage = sourceImage
+    self.sourceCGImage = sourceCGImage
     self.blurCacheManager = blurCacheManager
     var normalizedInteractiveBlurIds = interactiveBlurAnnotationIds
     if let interactiveBlurAnnotationId {
@@ -628,7 +632,8 @@ nonisolated struct AnnotationRenderer {
         effectValue: effectValue,
         allowApproximateReuse: shouldAllowApproximateReuse,
         renderSynchronously: false,
-        quality: shouldAllowApproximateReuse ? .interactive : .settled
+        quality: shouldAllowApproximateReuse ? .interactive : .settled,
+        resolvedSourceCGImage: sourceCGImage
       ) {
         switch blurType {
         case .pixelated:
@@ -708,9 +713,10 @@ nonisolated struct AnnotationRenderer {
   }
 
   private func alignToSourcePixelGrid(_ rect: CGRect, sourceImage: NSImage) -> CGRect {
+    let resolvedCGImage = sourceCGImage ?? sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
     guard sourceImage.size.width > 0,
           sourceImage.size.height > 0,
-          let cgImage = sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil),
+          let cgImage = resolvedCGImage,
           cgImage.width > 0,
           cgImage.height > 0 else {
       return rect
