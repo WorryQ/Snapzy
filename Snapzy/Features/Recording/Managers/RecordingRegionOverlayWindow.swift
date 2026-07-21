@@ -138,6 +138,16 @@ final class RecordingRegionOverlayWindow: NSPanel {
     overlayView.needsDisplay = true
   }
 
+  /// Enable or disable the dim fill outside the recording region.
+  /// Called at record-start (and on live preference changes) so non-selected
+  /// windows stay fully visible and usable during recording.
+  func setDimEnabled(_ enabled: Bool) {
+    guard overlayView.showDim != enabled else { return }
+    overlayView.showDim = enabled
+    // Full-view invalidate (not dirty-rect) so any previously drawn dim is fully cleared.
+    overlayView.needsDisplay = true
+  }
+
   /// Enable or disable mouse interaction (disabled during recording)
   func setInteractionEnabled(_ enabled: Bool) {
     ignoresMouseEvents = !enabled
@@ -175,6 +185,7 @@ final class RecordingRegionOverlayView: NSView {
 
   var highlightRect: CGRect
   var showBorder: Bool = true
+  var showDim: Bool = true
   var isInteractionEnabled: Bool = false
   var guidance: RecordingRegionOverlayGuidance? {
     didSet {
@@ -730,9 +741,11 @@ final class RecordingRegionOverlayView: NSView {
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
 
-    // Draw dim overlay — only the dirty region
-    dimColor.setFill()
-    dirtyRect.fill()
+    // Draw dim overlay — only the dirty region (skipped when dimming is disabled)
+    if showDim {
+      dimColor.setFill()
+      dirtyRect.fill()
+    }
 
     // If actively making new selection, draw that instead
     if isNewSelecting {
@@ -756,11 +769,13 @@ final class RecordingRegionOverlayView: NSView {
     // Clamp to bounds
     let clampedRect = localRect.intersection(bounds)
 
-    // Clear the highlight area (only the portion within dirtyRect)
-    let clearRect = clampedRect.intersection(dirtyRect)
-    if !clearRect.isNull {
-      NSColor.clear.setFill()
-      clearRect.fill(using: .copy)
+    // Clear the highlight area (only meaningful when a dim fill was drawn)
+    if showDim {
+      let clearRect = clampedRect.intersection(dirtyRect)
+      if !clearRect.isNull {
+        NSColor.clear.setFill()
+        clearRect.fill(using: .copy)
+      }
     }
 
     // Draw border around highlight (only in pre-record phase)

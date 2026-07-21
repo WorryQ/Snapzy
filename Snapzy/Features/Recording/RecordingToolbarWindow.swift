@@ -87,6 +87,12 @@ enum RecordingToolbarPreferences {
     defaults.object(forKey: PreferencesKeys.recordingShowCursor) as? Bool ?? true
   }
 
+  /// Whether the area outside the recording region is dimmed during recording.
+  /// Defaults to `true` (dimmed) to preserve prior behavior when unset.
+  static func dimNonSelectedArea(defaults: UserDefaults = .standard) -> Bool {
+    defaults.object(forKey: PreferencesKeys.recordingDimNonSelectedArea) as? Bool ?? true
+  }
+
   /// Whether the floating recording controls bar is shown during recording.
   /// Defaults to `true` (visible) to preserve prior behavior when unset.
   static func hoverBarVisible(defaults: UserDefaults = .standard) -> Bool {
@@ -140,6 +146,7 @@ final class RecordingToolbarState: ObservableObject {
   @Published var showCursor: Bool
   @Published var highlightClicks: Bool
   @Published var showKeystrokes: Bool
+  @Published var dimNonSelectedArea: Bool
   @Published var isPreparingToRecord: Bool = false
 
   var onCaptureModeChanged: ((RecordingCaptureMode) -> Void)?
@@ -155,6 +162,7 @@ final class RecordingToolbarState: ObservableObject {
     self.showCursor = RecordingToolbarPreferences.showCursor()
     self.highlightClicks = RecordingToolbarPreferences.highlightClicks()
     self.showKeystrokes = RecordingToolbarPreferences.showKeystrokes()
+    self.dimNonSelectedArea = RecordingToolbarPreferences.dimNonSelectedArea()
   }
 }
 

@@ -49,9 +49,19 @@ final class RecordingCoordinator: ObservableObject {
     let showCursor: Bool
     let highlightClicks: Bool
     let showKeystrokes: Bool
+    let dimNonSelectedArea: Bool
   }
 
-  private init() {}
+  private init() {
+    // Live-apply the dim preference while recording so toggling it in Settings (or the
+    // toolbar options) takes effect immediately, mirroring the hover-bar live toggle.
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(dimPreferenceDidChange),
+      name: UserDefaults.didChangeNotification,
+      object: nil
+    )
+  }
 
   private let tempCaptureManager = TempCaptureManager.shared
 
@@ -345,7 +355,8 @@ final class RecordingCoordinator: ObservableObject {
       outputMode: toolbarWindow.outputMode,
       showCursor: toolbarWindow.state.showCursor,
       highlightClicks: toolbarWindow.state.highlightClicks,
-      showKeystrokes: toolbarWindow.state.showKeystrokes
+      showKeystrokes: toolbarWindow.state.showKeystrokes,
+      dimNonSelectedArea: toolbarWindow.state.dimNonSelectedArea
     )
   }
 
@@ -363,6 +374,7 @@ final class RecordingCoordinator: ObservableObject {
       toolbar.state.showCursor = configuration.showCursor
       toolbar.state.highlightClicks = configuration.highlightClicks
       toolbar.state.showKeystrokes = configuration.showKeystrokes
+      toolbar.state.dimNonSelectedArea = configuration.dimNonSelectedArea
       return
     }
 
@@ -632,6 +644,17 @@ final class RecordingCoordinator: ObservableObject {
     }
   }
 
+  /// Re-applies the dim preference to the live region overlays when it changes.
+  /// Only acts while actively recording — the pre-record selection always keeps
+  /// its dim for selection feedback, regardless of the preference.
+  @objc private func dimPreferenceDidChange() {
+    guard recorder.state.isPauseResumeEligible, !regionOverlayWindows.isEmpty else { return }
+    let dimNonSelectedArea = RecordingToolbarPreferences.dimNonSelectedArea()
+    for overlay in regionOverlayWindows {
+      overlay.setDimEnabled(dimNonSelectedArea)
+    }
+  }
+
   private func startRecording() {
     guard let rect = selectedRect, let window = toolbarWindow else {
       DiagnosticLogger.shared.log(.warning, .recording, "Start recording ignored: missing selection or toolbar")
@@ -712,11 +735,13 @@ final class RecordingCoordinator: ObservableObject {
         try await recorder.startRecording()
         removeEscapeMonitors()
 
-        // Hide border on overlay (would appear in video)
-        // Disable interaction during recording
+        // Hide border on overlay (would appear in video), disable interaction, and
+        // apply the dim preference — off keeps non-selected windows fully visible.
+        let dimNonSelectedArea = RecordingToolbarPreferences.dimNonSelectedArea()
         for overlay in regionOverlayWindows {
           overlay.hideBorder()
           overlay.setInteractionEnabled(false)
+          overlay.setDimEnabled(dimNonSelectedArea)
         }
 
         // Setup annotation overlay (must be after recording starts so window exists)
@@ -841,9 +866,11 @@ final class RecordingCoordinator: ObservableObject {
         try await recorder.startRecording()
         removeEscapeMonitors()
 
+        let dimNonSelectedArea = RecordingToolbarPreferences.dimNonSelectedArea()
         for overlay in regionOverlayWindows {
           overlay.hideBorder()
           overlay.setInteractionEnabled(false)
+          overlay.setDimEnabled(dimNonSelectedArea)
         }
         window.showRecordingStatusBar(recorder: recorder, visible: isHoverBarVisiblePreference)
         finishRecordingStartAttempt()

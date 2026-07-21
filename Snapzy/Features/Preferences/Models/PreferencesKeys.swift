@@ -108,6 +108,7 @@ enum PreferencesKeys {
   static let recordingOutputMode = "recording.outputMode"
   static let recordingIncludeOwnApp = "recording.includeOwnApp"
   static let recordingShowCursor = "recording.showCursor"
+  static let recordingDimNonSelectedArea = "recording.dimNonSelectedArea"
   static let recordingHighlightClicks = "recording.highlightClicks"
   static let recordingShowKeystrokes = "recording.showKeystrokes"
   static let recordingHoverBarVisible = "recording.hoverBarVisible"

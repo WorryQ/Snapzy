@@ -66,7 +66,6 @@
         }
       }
     },
-
     "after-capture.copy-file-action": {
       "extractionState": "stale",
       "localizations": {
@@ -522,7 +521,6 @@
         }
       }
     },
-
     "capture-kind.recording": {
       "extractionState": "stale",
       "localizations": {
@@ -16968,6 +16966,134 @@
           "stringUnit": {
             "state": "translated",
             "value": "在狀態圖示旁顯示已錄製時長。"
+          }
+        }
+      }
+    },
+    "preferences-capture.recording-dim-non-selected-area-title": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht ausgewählten Bereich abdunkeln"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dim Non-Selected Area"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atenuar el área no seleccionada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assombrir la zone non sélectionnée"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択範囲外を暗くする"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택하지 않은 영역 어둡게 표시"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Затемнять невыбранную область"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm mờ vùng không được chọn"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调暗未选定区域"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "調暗未選取的區域"
+          }
+        }
+      }
+    },
+    "preferences-capture.recording-dim-non-selected-area-description": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dunkelt während der Aufnahme alles außerhalb des Aufnahmebereichs ab, damit der erfasste Bereich hervorsticht. Deaktivieren, damit andere Fenster während der Aufnahme vollständig sichtbar und nutzbar bleiben."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Darken everything outside the recording region while recording so the captured area stands out. Turn off to keep other windows fully visible and usable during recording."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oscurece todo lo que está fuera de la región de grabación mientras grabas para que el área capturada destaque. Desactívalo para mantener otras ventanas completamente visibles y utilizables durante la grabación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assombrit tout ce qui se trouve en dehors de la zone d'enregistrement pendant l'enregistrement afin de faire ressortir la zone capturée. Désactivez cette option pour garder les autres fenêtres entièrement visibles et utilisables pendant l'enregistrement."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "録画中に録画範囲の外側をすべて暗くして、キャプチャ領域を目立たせます。オフにすると、録画中も他のウインドウを完全に表示したまま操作できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "녹화하는 동안 녹화 영역 바깥을 어둡게 하여 캡처 영역이 돋보이도록 합니다. 끄면 녹화 중에도 다른 창을 완전히 보고 사용할 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Затемняет всё за пределами области записи во время записи, чтобы выделить захватываемую область. Отключите, чтобы другие окна оставались полностью видимыми и доступными во время записи."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm tối mọi thứ bên ngoài vùng ghi khi đang ghi để làm nổi bật vùng được ghi. Tắt để giữ cho các cửa sổ khác luôn hiển thị đầy đủ và có thể sử dụng trong khi ghi."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制时将录制区域以外的所有内容调暗，使捕获区域更加突出。关闭后，录制期间其他窗口仍可完全可见和使用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "錄製時將錄製區域以外的所有內容調暗，使擷取區域更加突出。關閉後，錄製期間其他視窗仍可完全顯示與使用。"
           }
         }
       }

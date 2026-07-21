@@ -126,6 +126,17 @@ private struct ToolbarOptionsPopoverContent: View {
             }
           )
         )
+
+        RightAlignedToggleRow(
+          title: L10n.RecordingToolbar.dimNonSelectedArea,
+          isOn: Binding(
+            get: { state.dimNonSelectedArea },
+            set: { newValue in
+              state.dimNonSelectedArea = newValue
+              UserDefaults.standard.set(newValue, forKey: PreferencesKeys.recordingDimNonSelectedArea)
+            }
+          )
+        )
       }
     }
     .padding(12)

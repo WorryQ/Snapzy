@@ -214,6 +214,9 @@ enum SnapzyConfigurationImporter {
     collectBool(&reader, "recording", "show_cursor", mutations: &mutations) {
       defaults.set($0, forKey: PreferencesKeys.recordingShowCursor)
     }
+    collectBool(&reader, "recording", "dim_non_selected_area", mutations: &mutations) {
+      defaults.set($0, forKey: PreferencesKeys.recordingDimNonSelectedArea)
+    }
     collectBool(&reader, "recording", "highlight_clicks", mutations: &mutations) {
       defaults.set($0, forKey: PreferencesKeys.recordingHighlightClicks)
     }

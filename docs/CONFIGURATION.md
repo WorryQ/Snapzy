@@ -142,6 +142,7 @@ fps = 30
 capture_system_audio = false
 capture_microphone = false
 show_cursor = true
+dim_non_selected_area = true
 highlight_clicks = false
 show_keystrokes = false
 video_editor_zoom_transition_duration = 0.4

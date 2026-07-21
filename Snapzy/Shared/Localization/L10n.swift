@@ -2588,6 +2588,16 @@ nonisolated enum L10n {
       defaultValue: "Include mouse pointer in recorded videos and GIFs",
       comment: "Recording preferences setting description"
     )
+    static let recordingDimNonSelectedAreaTitle = string(
+      "preferences-capture.recording-dim-non-selected-area-title",
+      defaultValue: "Dim Non-Selected Area",
+      comment: "Recording preferences setting title"
+    )
+    static let recordingDimNonSelectedAreaDescription = string(
+      "preferences-capture.recording-dim-non-selected-area-description",
+      defaultValue: "Darken everything outside the recording region while recording so the captured area stands out. Turn off to keep other windows fully visible and usable during recording.",
+      comment: "Recording preferences setting description"
+    )
     static let imageFormatTitle = string(
       "preferences-capture.image-format-title",
       defaultValue: "Image Format",
@@ -6396,6 +6406,11 @@ nonisolated enum L10n {
     static let showCursor = string(
       "recording-toolbar.show-cursor",
       defaultValue: "Show Cursor",
+      comment: "Recording toolbar setting label"
+    )
+    static let dimNonSelectedArea = string(
+      "recording-toolbar.dim-non-selected-area",
+      defaultValue: "Dim Non-Selected Area",
       comment: "Recording toolbar setting label"
     )
     static let outputModeAccessibilityPrefix = string(
