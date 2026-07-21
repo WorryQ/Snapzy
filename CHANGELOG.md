@@ -102,6 +102,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+
+## [1.30.0-beta.14] - 2026-07-21
+
+### Features
+-  Added dim non-selected area preference for recording (#270) (#402) (d70d9fc)
+
+### Chore
+- chore: update appcast for v1.30.0-beta.13 (3737ec2)
+
+### Contributors
+- @duongductrong
+- @github-actions[bot]
+
 ## [1.30.0-beta.13] - 2026-07-21
 
 ### Bug Fixes
