@@ -348,10 +348,24 @@ private final class HistoryFloatingContainerView: NSVisualEffectView {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor [weak self] in
-        self?.applyStyle()
+        self?.scheduleApplyStyle()
       }
     }
     applyStyle()
+  }
+
+  private var isApplyStyleScheduled = false
+
+  /// Coalesce bursts of UserDefaults changes (e.g. slider drags) into one style
+  /// application per runloop instead of a Task per notification (see issue #335).
+  private func scheduleApplyStyle() {
+    guard !isApplyStyleScheduled else { return }
+    isApplyStyleScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      isApplyStyleScheduled = false
+      applyStyle()
+    }
   }
 
   private func applyStyle() {

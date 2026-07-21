@@ -1719,6 +1719,73 @@ final class AnnotateCoreTests: XCTestCase {
   }
 
   @MainActor
+  func testPropertySliderGestureRecordsSingleUndoCheckpoint() throws {
+    let state = makeAnnotateState()
+    let annotation = AnnotationItem(
+      type: .text("Sized text"),
+      bounds: CGRect(x: 20, y: 20, width: 180, height: 32),
+      properties: AnnotationProperties(fontSize: 18)
+    )
+    state.annotations = [annotation]
+    state.selectedAnnotationId = annotation.id
+
+    state.setPropertySliderGestureEditing(true)
+    state.updateAnnotationProperties(id: annotation.id, fontSize: 24, recordsUndo: true)
+    state.updateAnnotationProperties(id: annotation.id, fontSize: 36, recordsUndo: true)
+    state.updateAnnotationProperties(id: annotation.id, fontSize: 48, recordsUndo: true)
+    state.setPropertySliderGestureEditing(false)
+
+    XCTAssertEqual(try XCTUnwrap(state.annotations.first).properties.fontSize, 48)
+
+    state.undo()
+
+    XCTAssertEqual(try XCTUnwrap(state.annotations.first).properties.fontSize, 18)
+    XCTAssertFalse(state.canUndo)
+  }
+
+  @MainActor
+  func testPropertySliderGestureWithoutChangeRecordsNoUndo() throws {
+    let state = makeAnnotateState()
+    let annotation = AnnotationItem(
+      type: .text("Sized text"),
+      bounds: CGRect(x: 20, y: 20, width: 180, height: 32),
+      properties: AnnotationProperties(fontSize: 18)
+    )
+    state.annotations = [annotation]
+    state.selectedAnnotationId = annotation.id
+
+    state.setPropertySliderGestureEditing(true)
+    state.setPropertySliderGestureEditing(false)
+
+    XCTAssertFalse(state.canUndo)
+  }
+
+  @MainActor
+  func testUndoStackIsCappedDuringRapidPropertyEdits() throws {
+    let state = makeAnnotateState()
+    let annotation = AnnotationItem(
+      type: .text("Sized text"),
+      bounds: CGRect(x: 20, y: 20, width: 180, height: 32),
+      properties: AnnotationProperties(fontSize: 12)
+    )
+    state.annotations = [annotation]
+    state.selectedAnnotationId = annotation.id
+
+    // 60 individual (non-gesture) property edits push 60 undo checkpoints.
+    for size in 13 ... 72 {
+      state.updateAnnotationProperties(id: annotation.id, fontSize: CGFloat(size), recordsUndo: true)
+    }
+
+    var undoCount = 0
+    while state.canUndo {
+      state.undo()
+      undoCount += 1
+    }
+    XCTAssertEqual(undoCount, 50)
+    XCTAssertEqual(try XCTUnwrap(state.annotations.first).properties.fontSize, 22)
+  }
+
+  @MainActor
   func testSharedParameterDefaultsPersistAcrossAnnotateStateInstances() {
     let defaults = UserDefaultsFactory.make()
     let firstState = makeAnnotateState(defaults: defaults)

@@ -47,7 +47,8 @@ struct TextStylingSection: View {
           get: { annotation.properties.fontSize },
           set: { state.updateAnnotationProperties(id: annotation.id, fontSize: $0, recordsUndo: true) }
         ).stepped(by: 1, in: 12 ... 72),
-        in: 12 ... 72
+        in: 12 ... 72,
+        onEditingChanged: { state.setPropertySliderGestureEditing($0) }
       )
       .controlSize(.small)
     }

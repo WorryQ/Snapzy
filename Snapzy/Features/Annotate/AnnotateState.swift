@@ -201,6 +201,10 @@ final class AnnotateState: ObservableObject {
   @Published private var annotationToolProperties: [AnnotationToolType: AnnotationProperties] = [:]
   private var isQuickPropertiesGestureEditing = false
   private var quickPropertiesGestureUndoSnapshot: AnnotationSnapshot?
+  // Sidebar property slider drags (e.g. text font size) coalesce undo into one
+  // checkpoint per gesture instead of one snapshot per tick (see issue #335).
+  private var isPropertySliderGestureEditing = false
+  private var propertySliderGestureUndoSnapshot: AnnotationSnapshot?
   private var sharedAnnotationColor: Color?
   private var sharedAnnotationParameterDefaults = SharedAnnotationParameterDefaults()
   /// New text starts as a natural-width line. Resizing it switches that item
@@ -1243,7 +1247,36 @@ final class AnnotateState: ObservableObject {
 
   // MARK: - Annotations
 
-  @Published var annotations: [AnnotationItem] = []
+  @Published var annotations: [AnnotationItem] = [] {
+    didSet {
+      // Mutations outside `updateAnnotationProperties` are structural
+      // (add/remove/undo/drag-commit) and can't be redrawn via dirty rects.
+      if !isApplyingPropertyEdit {
+        pendingFullCanvasInvalidation = true
+      }
+    }
+  }
+
+  /// True while `updateAnnotationProperties` applies mutations — lets the
+  /// annotations observer tell property-only edits apart from structural ones.
+  private var isApplyingPropertyEdit = false
+  /// Image-space rects dirtied by property-only edits since the last flush.
+  private var pendingPropertyEditRects: [CGRect] = []
+  /// Set when a mutation can't be served by dirty rects (structural change, or
+  /// a property affecting full-canvas layers such as spotlight dimming).
+  private var pendingFullCanvasInvalidation = false
+
+  /// Drains pending invalidation info for the canvas view. Scoped dirty rects
+  /// let property slider drags redraw only the edited annotation instead of
+  /// every layer in full bounds (see issue #335).
+  func consumePendingCanvasInvalidation() -> (rects: [CGRect], needsFullRedraw: Bool) {
+    defer {
+      pendingPropertyEditRects.removeAll()
+      pendingFullCanvasInvalidation = false
+    }
+    return (pendingPropertyEditRects, pendingFullCanvasInvalidation)
+  }
+
   /// Imported image assets referenced by `.embeddedImage(assetId)` annotations.
   @Published private(set) var embeddedImageAssets: [UUID: NSImage] = [:]
   /// Non-blocking warning for large multi-image imports.
@@ -2238,6 +2271,10 @@ final class AnnotateState: ObservableObject {
 
   // MARK: - Undo/Redo Methods
 
+  /// Bounds undo memory; per-tick slider snapshots previously grew the stack
+  /// without limit during a single drag (see issue #335).
+  private static let maxUndoStackSize = 50
+
   func saveState() {
     pushUndoSnapshot(currentSnapshot(), annotationCount: annotations.count)
   }
@@ -2245,6 +2282,7 @@ final class AnnotateState: ObservableObject {
   private func pushUndoSnapshot(_ snapshot: AnnotationSnapshot, annotationCount: Int) {
     DiagnosticLogger.shared.log(.debug, .annotate, "Undo checkpoint", context: ["annotations": "\(annotationCount)"])
     undoStack.append(.annotations(snapshot))
+    capUndoStack()
     redoStack.removeAll()
     canUndo = true
     canRedo = false
@@ -2254,10 +2292,17 @@ final class AnnotateState: ObservableObject {
   private func pushRotationUndo(_ snapshot: RotationSnapshot) {
     DiagnosticLogger.shared.log(.debug, .annotate, "Undo checkpoint", context: ["kind": "rotation"])
     undoStack.append(.rotation(snapshot))
+    capUndoStack()
     redoStack.removeAll()
     canUndo = true
     canRedo = false
     hasUnsavedChanges = true
+  }
+
+  private func capUndoStack() {
+    if undoStack.count > Self.maxUndoStackSize {
+      undoStack.removeFirst(undoStack.count - Self.maxUndoStackSize)
+    }
   }
 
   func undo() {
@@ -3023,8 +3068,17 @@ final class AnnotateState: ObservableObject {
     ) else { return }
 
     if recordsUndo {
-      saveState()
+      if let snapshot = propertySliderGestureUndoSnapshot {
+        pushUndoSnapshot(snapshot, annotationCount: snapshot.annotations.count)
+        propertySliderGestureUndoSnapshot = nil
+      } else if !isPropertySliderGestureEditing {
+        saveState()
+      }
     }
+
+    let oldSelectionBounds = annotations[index].selectionBounds
+    isApplyingPropertyEdit = true
+    defer { isApplyingPropertyEdit = false }
 
     if let strokeWidth = strokeWidth {
       let clampedWidth = AnnotationProperties.clampedControlValue(strokeWidth)
@@ -3068,6 +3122,14 @@ final class AnnotateState: ObservableObject {
     }
     if let spotlightOpacity = spotlightOpacity {
       annotations[index].properties.spotlightOpacity = AnnotationProperties.clampedSpotlightOpacity(spotlightOpacity)
+    }
+
+    // Spotlight dimming paints the full canvas — its opacity edits need a full
+    // redraw; everything else is scoped to the edited annotation's bounds.
+    if spotlightOpacity != nil {
+      pendingFullCanvasInvalidation = true
+    } else {
+      pendingPropertyEditRects.append(oldSelectionBounds.union(annotations[index].selectionBounds))
     }
     hasUnsavedChanges = true
   }
@@ -3993,6 +4055,20 @@ final class AnnotateState: ObservableObject {
     } else {
       isQuickPropertiesGestureEditing = false
       quickPropertiesGestureUndoSnapshot = nil
+    }
+  }
+
+  /// Marks a sidebar property slider drag as one undo gesture. The pre-gesture
+  /// snapshot is pushed once on the first actual change; a drag that changes
+  /// nothing records no undo entry.
+  func setPropertySliderGestureEditing(_ isEditing: Bool) {
+    if isEditing {
+      guard !isPropertySliderGestureEditing else { return }
+      isPropertySliderGestureEditing = true
+      propertySliderGestureUndoSnapshot = currentSnapshot()
+    } else {
+      isPropertySliderGestureEditing = false
+      propertySliderGestureUndoSnapshot = nil
     }
   }
 

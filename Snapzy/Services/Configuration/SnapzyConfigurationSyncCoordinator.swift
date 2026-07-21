@@ -137,11 +137,6 @@ final class SnapzyConfigurationSyncCoordinator: ObservableObject {
 
   func scheduleSync(reason: Reason) {
     guard isStarted else { return }
-    if reason == .defaultsChanged,
-       let lastAttemptedSettingsSignature,
-       currentSettingsSignature() == lastAttemptedSettingsSignature {
-      return
-    }
 
     if isSyncing {
       needsFollowUpSync = true
@@ -155,6 +150,18 @@ final class SnapzyConfigurationSyncCoordinator: ObservableObject {
       try? await Task.sleep(nanoseconds: delay)
       guard let self, !Task.isCancelled else { return }
       self.debounceTask = nil
+      // The unchanged-signature skip runs here — once after edits settle, never
+      // per notification. The signature is a full TOML export + SHA256, so
+      // computing it per UserDefaults change (e.g. every slider tick) stalls
+      // the main thread (see issue #335).
+      if reason == .defaultsChanged,
+         let lastAttemptedSettingsSignature = self.lastAttemptedSettingsSignature,
+         self.currentSettingsSignature() == lastAttemptedSettingsSignature {
+        if self.status == .scheduled {
+          self.status = .idle
+        }
+        return
+      }
       do {
         try await self.syncNowInBackground(reason: reason)
       } catch {

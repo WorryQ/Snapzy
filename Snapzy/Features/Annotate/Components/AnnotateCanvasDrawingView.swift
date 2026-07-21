@@ -205,7 +205,7 @@ final class DrawingCanvasNSView: NSView {
     stateObservers.removeAll()
     // Content-driving publishers: redraw every layer.
     state.$annotations
-      .sink { [weak self] _ in self?.invalidateDrawing() }
+      .sink { [weak self] _ in self?.scheduleAnnotationsInvalidation() }
       .store(in: &stateObservers)
     state.$selectedAnnotationIds
       .sink { [weak self] _ in self?.invalidateDrawing() }
@@ -278,6 +278,29 @@ final class DrawingCanvasNSView: NSView {
       guard let self else { return }
       isLiveInvalidationScheduled = false
       invalidateLiveLayers()
+    }
+  }
+
+  private var isAnnotationsInvalidationScheduled = false
+
+  /// Coalesce bursts of annotation mutations (e.g. property slider drags) into
+  /// one redraw per runloop. Property-only edits redraw just the edited
+  /// annotations' dirty rects instead of every layer in full bounds (issue #335).
+  private func scheduleAnnotationsInvalidation() {
+    guard !isAnnotationsInvalidationScheduled else { return }
+    isAnnotationsInvalidationScheduled = true
+
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      isAnnotationsInvalidationScheduled = false
+      let pending = state.consumePendingCanvasInvalidation()
+      if pending.needsFullRedraw || pending.rects.isEmpty {
+        invalidateDrawing()
+      } else {
+        for rect in pending.rects {
+          invalidateDisplay(forImageRect: rect)
+        }
+      }
     }
   }
 

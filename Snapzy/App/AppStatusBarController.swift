@@ -236,9 +236,23 @@ final class AppStatusBarController: ObservableObject {
     NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
       .receive(on: RunLoop.main)
       .sink { [weak self] _ in
-        self?.renderStatusItem()
+        self?.scheduleRenderStatusItem()
       }
       .store(in: &cancellables)
+  }
+
+  private var isStatusItemRenderScheduled = false
+
+  /// Coalesce bursts of UserDefaults changes (e.g. slider drags) into one
+  /// status-item render per runloop (see issue #335).
+  private func scheduleRenderStatusItem() {
+    guard !isStatusItemRenderScheduled else { return }
+    isStatusItemRenderScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      isStatusItemRenderScheduled = false
+      renderStatusItem()
+    }
   }
 
   private func renderStatusItem() {

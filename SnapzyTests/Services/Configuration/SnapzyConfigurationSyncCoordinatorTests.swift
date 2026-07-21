@@ -166,6 +166,38 @@ final class SnapzyConfigurationSyncCoordinatorTests: XCTestCase {
     XCTAssertEqual(syncCount, 1)
   }
 
+  func testDefaultsChangeSignatureIsComputedOnceAfterDebounceNotPerRequest() async throws {
+    let fileURL = temporaryConfigURL()
+    var signatureCount = 0
+    let coordinator = makeCoordinator(
+      debounceInterval: 0.05,
+      sync: {
+        SnapzyConfigurationSyncResult(
+          status: .synced,
+          fileURL: fileURL,
+          exportedSettingsSignature: "old"
+        )
+      },
+      currentSettingsSignature: {
+        signatureCount += 1
+        return "new"
+      }
+    )
+    defer { coordinator.stop() }
+
+    coordinator.start()
+    try coordinator.syncNow(reason: .manual)
+    XCTAssertEqual(signatureCount, 0)
+
+    coordinator.scheduleSync(reason: .defaultsChanged)
+    coordinator.scheduleSync(reason: .defaultsChanged)
+    coordinator.scheduleSync(reason: .defaultsChanged)
+    XCTAssertEqual(signatureCount, 0)
+
+    try await Task.sleep(nanoseconds: 150_000_000)
+    XCTAssertEqual(signatureCount, 1)
+  }
+
   func testManualSyncStatusWinsOverOlderInFlightBackgroundSync() async throws {
     let fileURL = temporaryConfigURL()
     let backgroundStarted = expectation(description: "background sync started")
